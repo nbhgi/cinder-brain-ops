@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#0a0a0f">
+<title>Cinder // 远程控制台</title>
+<style>
+:root{--bg:#0a0a0f;--sf:rgba(255,255,255,.045);--sf2:rgba(255,255,255,.075);--bd:rgba(255,255,255,.085);--bd2:rgba(255,255,255,.16);
+--ac:#6c5ce7;--ac2:#00cec9;--ok:#2ed573;--er:#ff4757;--wn:#ffa502;--t0:#eeeef2;--t1:#9a9aa8;--t2:#666674;--r:14px}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--t0);min-height:100vh;overflow-x:hidden}
+.au{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.au::before,.au::after{content:'';position:absolute;width:70vw;height:70vw;border-radius:50%;filter:blur(120px);opacity:.13;animation:df 20s ease-in-out infinite alternate}
+.au::before{background:var(--ac);top:-10%;left:-10%}
+.au::after{background:var(--ac2);bottom:-20%;right:-10%;animation-delay:-10s}
+@keyframes df{0%{transform:translate(0,0) scale(1)}50%{transform:translate(5%,3%) scale(1.05)}100%{transform:translate(-3%,5%) scale(.95)}}
+header{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px;
+background:rgba(10,10,15,.74);backdrop-filter:blur(18px);border-bottom:1px solid var(--bd)}
+.brand{display:flex;align-items:center;gap:7px;font-weight:700;font-size:1rem;white-space:nowrap}
+.brand i{width:9px;height:9px;border-radius:50%;background:var(--ok);box-shadow:0 0 10px var(--ok);animation:pl 2s infinite;font-style:normal}
+@keyframes pl{0%,100%{opacity:1}50%{opacity:.35}}
+.pill{display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:20px;font-size:.7rem;font-weight:600;border:1px solid var(--bd);background:var(--sf);white-space:nowrap}
+.pill b{width:7px;height:7px;border-radius:50%;background:var(--er)}
+.pill.on b{background:var(--ok);box-shadow:0 0 6px var(--ok)}
+.mw{position:relative}
+.mb{width:36px;height:36px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:var(--sf);border:1px solid var(--bd);border-radius:9px;cursor:pointer}
+.mb s{width:16px;height:2px;border-radius:2px;background:var(--t1);text-decoration:none}
+.dd{position:absolute;right:0;top:44px;min-width:240px;max-height:68vh;overflow:auto;background:rgba(18,18,26,.96);backdrop-filter:blur(20px);
+border:1px solid var(--bd2);border-radius:var(--r);padding:6px;opacity:0;visibility:hidden;transform:translateY(-6px);transition:.2s;box-shadow:0 18px 50px rgba(0,0,0,.55)}
+.dd.op{opacity:1;visibility:visible;transform:translateY(0)}
+.dl{padding:7px 11px 3px;font-size:.63rem;letter-spacing:1.4px;color:var(--t2)}
+.di{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:9px;cursor:pointer;font-size:.84rem;color:var(--t1);background:none;border:none;width:100%;text-align:left}
+.di:hover{background:var(--sf2);color:var(--t0)}
+.ds{height:1px;background:var(--bd);margin:4px 8px}
+main{position:relative;z-index:1;max-width:1200px;margin:0 auto;padding:14px}
+.qr{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px}
+@media(min-width:640px){.qr{grid-template-columns:repeat(5,1fr)}}
+.qc{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px 8px;cursor:pointer;transition:.22s;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+.qc:hover,.qc.ac{border-color:var(--ac);box-shadow:0 8px 26px rgba(108,92,231,.35)}
+.qc em{font-size:1.6em;font-style:normal}.qc span{font-size:.78rem;font-weight:600;color:var(--t1)}
+.pn{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;margin-bottom:14px}
+.hd{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:11px 13px;border-bottom:1px solid var(--bd)}
+.hd h2{font-size:.78rem;font-weight:700;color:var(--t1);display:flex;align-items:center;gap:6px}
+.bd{padding:13px}.bd0{padding:0}
+.hd2{display:none}.hd2.sh{display:block}
+.lv{width:100%;aspect-ratio:16/9;background:#000;position:relative;display:flex;align-items:center;justify-content:center}
+.lv img{width:100%;height:100%;object-fit:contain;display:block}
+.ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;color:var(--t2);padding:0 20px;text-align:center}
+.ov em{font-size:2.4em;font-style:normal;opacity:.4}
+.ov small{font-size:.72em;line-height:1.6}
+.lb{position:absolute;top:9px;left:9px;padding:3px 8px;border-radius:6px;font-size:.62rem;font-weight:700;background:rgba(255,71,87,.2);color:var(--er);border:1px solid rgba(255,71,87,.3)}
+.lb.on{background:rgba(46,213,115,.2);color:var(--ok);border-color:rgba(46,213,115,.3)}
+.gy{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:9px}
+.gi{aspect-ratio:16/9;background:#000;border:1px solid var(--bd);border-radius:9px;overflow:hidden;cursor:pointer;position:relative}
+.gi img{width:100%;height:100%;object-fit:cover;display:block}
+.gi i{position:absolute;bottom:3px;right:5px;font-size:.56rem;color:#fff;background:rgba(0,0,0,.6);padding:1px 4px;border-radius:3px;font-style:normal}
+.dv{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;border:1px solid transparent;cursor:pointer}
+.dv:hover{background:var(--sf2);border-color:var(--bd)}
+.dv .av{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--ac),var(--ac2));display:flex;align-items:center;justify-content:center;font-size:1.05em;flex-shrink:0}
+.dv .nm{flex:1;font-size:.85rem;font-weight:600}
+.dv .st{font-size:.68rem;color:var(--t2)}
+.cr{display:flex;gap:7px;flex-wrap:wrap}
+.cb{display:flex;align-items:center;gap:5px;padding:8px 11px;border-radius:9px;border:1px solid var(--bd);background:var(--sf);color:var(--t1);font-size:.78rem;font-weight:600;cursor:pointer}
+.cb:hover{background:var(--sf2);border-color:var(--ac);color:var(--t0)}
+.cb.dg:hover{border-color:var(--er);color:var(--er)}
+.fl{list-style:none}.fl li{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:9px;cursor:pointer;border:1px solid transparent}
+.fl li:hover{background:var(--sf2);border-color:var(--bd)}
+.fl .fi{font-size:1.05em;width:18px;text-align:center}.fl .fn{flex:1;font-size:.82rem;word-break:break-all}
+.fl .fs,.fl .fd{font-size:.68rem;color:var(--t2)}
+.bc{display:flex;align-items:center;gap:4px;padding:8px 11px;font-size:.78rem;color:var(--t1);border-bottom:1px solid var(--bd);flex-wrap:wrap}
+.bc u{cursor:pointer;text-decoration:none;padding:1px 4px;border-radius:3px}.bc u.sp{opacity:.35;cursor:default}
+.sg{display:grid;grid-template-columns:1fr;gap:11px}
+@media(min-width:640px){.sg{grid-template-columns:1fr 1fr}}
+.si{display:flex;flex-direction:column;gap:5px}.si label{font-size:.72rem;font-weight:600;color:var(--t1)}
+.si input,.si select{padding:9px 10px;background:#11111a;border:1px solid var(--bd);border-radius:9px;color:var(--t0);font-size:.84rem;outline:none;width:100%}
+.si input:focus{border-color:var(--ac)}
+.sw{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--bd)}
+.sw:last-child{border-bottom:none}.sw span{font-size:.82rem;color:var(--t1)}
+.tg{position:relative;width:42px;height:23px}.tg input{display:none}
+.tg i{position:absolute;inset:0;background:#2a2a36;border-radius:23px;transition:.2s;cursor:pointer}
+.tg i::before{content:'';position:absolute;width:17px;height:17px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+.tg input:checked+i{background:var(--ac)}.tg input:checked+i::before{transform:translateX(19px)}
+.tw{position:fixed;bottom:16px;left:12px;right:12px;z-index:9999;display:flex;flex-direction:column;gap:7px}
+@media(min-width:640px){.tw{left:auto;width:360px}}
+.ts{padding:10px 13px;border-radius:9px;font-size:.8rem;font-weight:500;backdrop-filter:blur(14px);border:1px solid var(--bd2);animation:si .28s}
+.ts.ok{background:rgba(46,213,115,.15);color:var(--ok);border-color:rgba(46,213,115,.3)}
+.ts.er{background:rgba(255,71,87,.15);color:var(--er);border-color:rgba(255,71,87,.3)}
+.ts.wr{background:rgba(255,165,2,.15);color:var(--wn);border-color:rgba(255,165,2,.3)}
+.ts.nf{background:rgba(108,92,231,.15);color:#a29bfe;border-color:rgba(108,92,231,.3)}
+@keyframes si{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
+.mo{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.66);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;opacity:0;visibility:hidden;transition:.22;padding:14px}
+.mo.op{opacity:1;visibility:visible}
+.md{background:#181822;border:1px solid var(--bd2);border-radius:var(--r);padding:18px;max-width:92vw;max-height:86vh;overflow:auto;position:relative;width:100%}
+.mc{position:absolute;top:10px;right:10px;width:29px;height:29px;display:flex;align-items:center;justify-content:center;background:var(--sf);border:1px solid var(--bd);border-radius:7px;cursor:pointer;color:var(--t1)}
+.md h3{font-size:.95rem;margin-bottom:10px}
+.md p{font-size:.8rem;color:var(--t1);line-height:1.6;margin-bottom:9px}
+.lg{background:#0d0d13;border:1px solid var(--bd);border-radius:9px;padding:9px;font-family:monospace;font-size:.7rem;color:var(--ac2);max-height:230px;overflow:auto;white-space:pre-wrap;word-break:break-all}
+.ep{color:var(--t2);font-size:.8rem;padding:18px 0;text-align:center;width:100%}
+.mono{font-family:monospace;font-size:.66rem;color:var(--t2);word-break:break-all;margin-top:6px;display:block}
+</style>
+</head>
+<body>
+<div class="au"></div>
+
+<header>
+  <div class="brand"><i></i>Cinder<span style="color:var(--ac)">//</span>远程控制台</div>
+  <div class="pill" id="pill"><b></b><span id="ptxt">连接中…</span></div>
+  <div class="mw">
+    <div class="mb" id="mb"><s></s><s></s><s></s></div>
+    <div class="dd" id="dd">
+      <div class="dl">实时</div>
+      <button class="di" data-a="live"><span>📡</span>实时画面</button>
+      <button class="di" data-a="shot"><span>📸</span>截屏</button>
+      <button class="di" data-a="rec"><span>⏺️</span>开始录像</button>
+      <div class="dl">控制</div>
+      <button class="di" data-a="ctrl"><span>🎮</span>控制面板</button>
+      <button class="di" data-a="tp"><span>👆</span>触摸板 / 手势</button>
+      <button class="di" data-a="keys"><span>⌨️</span>发送按键</button>
+      <button class="di" data-a="clip"><span>📋</span>剪贴板同步</button>
+      <button class="di" data-a="msg"><span>💬</span>弹窗消息</button>
+      <button class="di" data-a="shell"><span>🖥️</span>执行命令</button>
+      <div class="dl">文件</div>
+      <button class="di" data-a="mt"><span>📂</span>MT 目录</button>
+      <button class="di" data-a="desk"><span>🏠</span>返回桌面</button>
+      <button class="di" data-a="album"><span>🖼️</span>相册</button>
+      <button class="di" data-a="dl"><span>⬇️</span>下载目录</button>
+      <div class="dl">设备</div>
+      <button class="di" data-a="info"><span>📱</span>设备信息</button>
+      <button class="di" data-a="log"><span>📜</span>运行日志</button>
+      <div class="ds"></div>
+      <button class="di" data-a="set"><span>⚙️</span>设置</button>
+      <button class="di" data-a="re"><span>🔄</span>重新连接</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="qr">
+    <div class="qc ac" data-a="live"><em>📡</em><span>实时画面</span></div>
+    <div class="qc" data-a="shot"><em>📸</em><span>截屏</span></div>
+    <div class="qc" data-a="ctrl"><em>🎮</em><span>控制</span></div>
+    <div class="qc" data-a="mt"><em>📂</em><span>MT 目录</span></div>
+    <div class="qc" data-a="album"><em>🖼️</em><span>相册</span></div>
+  </div>
+
+  <div class="pn" id="p-dev">
+    <div class="hd"><h2>📱 设备列表</h2><div class="cr"><button class="cb" id="bScan">🔄 刷新</button></div></div>
+    <div class="bd" style="padding:7px" id="devList"><div class="ep">扫描中…</div></div>
+  </div>
+
+  <div class="pn hd2" id="p-live">
+    <div class="hd">
+      <h2>📡 实时画面</h2>
+      <div class="cr"><button class="cb" id="bStart">▶ 开始</button><button class="cb" id="bStop">⏹ 停止</button><button class="cb" id="bRef">🔄 刷新</button></div>
+    </div>
+    <div class="bd0">
+      <div class="lv" id="lv">
+        <div class="lb" id="lb">离线</div>
+        <div class="ov" id="ov"><em>📡</em><small id="ovt">点「开始」启动实时画面</small></div>
+        <img id="limg" style="display:none" alt="实时画面">
+      </div>
+    </div>
+  </div>
+
+  <div class="pn hd2" id="p-shot">
+    <div class="hd"><h2>📸 截屏</h2><div class="cr"><button class="cb" id="bShot">📸 立即截屏</button></div></div>
+    <div class="bd"><div class="gy" id="gy"><div class="ep">暂无截图</div></div></div>
+  </div>
+
+  <div class="pn hd2" id="p-file">
+    <div class="hd">
+      <h2 id="ftitle">📂 文件</h2>
+      <div class="cr"><button class="cb" data-g="desk">🏠 桌面</button><button class="cb" data-g="mt">📂 MT</button><button class="cb" data-g="album">🖼️ 相册</button><button class="cb" data-g="dl">⬇️ 下载</button></div>
+    </div>
+    <div class="bc" id="bc"><u data-p="/">根目录</u></div>
+    <div class="bd" style="padding:7px"><ul class="fl" id="fl"></ul></div>
+  </div>
+
+  <div class="pn hd2" id="p-ctrl">
+    <div class="hd"><h2>🎮 远程控制</h2></div>
+    <div class="bd"><div class="cr">
+      <button class="cb" data-c="lock">🔒 锁屏</button><button class="cb" data-c="unlock">🔓 解锁</button>
+      <button class="cb" data-c="home">🏠 主页</button><button class="cb" data-c="back">◀ 返回</button>
+      <button class="cb" data-c="recent">▢ 最近任务</button><button class="cb" data-c="notifications">🔔 通知栏</button>
+      <button class="cb" data-c="quick_settings">⚡ 快捷设置</button><button class="cb" data-c="volume_up">🔊 音量+</button>
+      <button class="cb" data-c="volume_down">🔉 音量−</button><button class="cb" data-c="power">⏻ 电源</button>
+      <button class="cb" data-c="screenshot">📸 系统截屏</button><button class="cb dg" data-c="reboot">🔄 重启</button>
+    </div></div>
+  </div>
+
+  <div class="pn hd2" id="p-set">
+    <div class="hd"><h2>⚙️ 设置</h2></div>
+    <div class="bd">
+      <div class="sg">
+        <div class="si"><label>后端地址</label><input id="cBe" value="https://cinder-brain-ops.onrender.com"></div>
+        <div class="si"><label>刷新间隔（毫秒）</label><input id="cIv" type="number" value="2000" min="400" max="10000"></div>
+        <div class="si"><label>鉴权令牌（可选）</label><input id="cTk" type="password" placeholder="留空则不发送"></div>
+        <div class="si"><label>当前设备 ID（可选）</label><input id="cDv" placeholder="控制 / 文件接口携带"></div>
+      </div>
+      <div style="margin-top:9px">
+        <div class="sw"><span>截图并入画廊</span><label class="tg"><input type="checkbox" id="cAuto" checked><i></i></label></div>
+        <div class="sw"><span>连接失败时只提示一次</span><label class="tg"><input type="checkbox" id="cQuiet" checked><i></i></label></div>
+      </div>
+      <div style="margin-top:12px" class="cr"><button class="cb" id="bSave">💾 保存</button><button class="cb" id="bTest">🔌 测试连接</button></div>
+      <span class="mono" id="diag"></span>
+    </div>
+  </div>
+</main>
+
+<div class="tw" id="tw"></div>
+
+<div class="mo" id="mImg"><div class="md" style="padding:9px;max-width:95vw"><div class="mc" data-close>✕</div><img id="mImgS" style="max-width:100%;max-height:78vh;border-radius:8px;display:block" src="" alt="预览"></div></div>
+<div class="mo" id="mGen"><div class="md"><div class="mc" data-close>✕</div><h3 id="gT"></h3><div id="gB"></div></div></div>
+
+<script>
+(function(){
+'use strict';
+var LS=localStorage, $=function(s){return document.querySelector(s)};
+function native(){ return !!window.AndroidBridge }
+function ncall(fn,a,b){ if(native()){ try{ return AndroidBridge[fn](a,b) }catch(e){} } return null }
+
+var C={
+  be: ncall('backend') || LS.getItem('cinder_be') || 'https://cinder-brain-ops.onrender.com',
+  iv: parseInt(LS.getItem('cinder_iv')||'2000',10),
+  tk: ncall('token') || LS.getItem('cinder_tk') || '',
+  dv: LS.getItem('cinder_dv') || '',
+  auto: LS.getItem('cinder_auto')!=='0',
+  quiet: LS.getItem('cinder_quiet')!=='1'
+};
+var S={stream:false,timer:null,rec:false,frames:[],online:false,devs:[],notified:false};
+
+function toast(m,t){
+  var e=document.createElement('div'); e.className='ts '+(t||'nf'); e.textContent=m;
+  $('#tw').appendChild(e); ncall('toastMsg',m);
+  setTimeout(function(){ e.style.opacity='0'; e.style.transition='all .3s'; e.style.transform='translateY(14px)'; setTimeout(function(){e.remove()},320) },3000);
+}
+function save(){ LS.setItem('cinder_be',C.be); LS.setItem('cinder_iv',C.iv); LS.setItem('cinder_tk',C.tk); LS.setItem('cinder_dv',C.dv); LS.setItem('cinder_auto',C.auto?'1':'0'); LS.setItem('cinder_quiet',C.quiet?'1':'0'); }
+function base(){ return C.be.replace(/\/+$/,'') }
+function headers(json){ var h={}; if(json) h['Content-Type']='application/json'; if(C.tk) h['Authorization']='Bearer '+C.tk; return h }
+
+/* 核心修复：不再依赖 Fetch。先试 fetch，失败自动切 XHR.
+   XHR 在 file:// 页面下通常比 fetch 更能通过浏览器对 https 的请求，
+   APK/WebView 里则完全不受跨域限制。 */
+function req(path,o){
+  o=o||{};
+  var url=base()+path, method=o.method||'GET', body=o.body;
+  if(window.fetch){
+    return fetch(url,{method:method,headers:headers(!!body),body:body}).then(function(r){
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      var ct=r.headers.get('content-type')||'';
+      return ct.indexOf('application/json')>=0 ? r.json() : r.blob();
+    })['catch'](function(err){ return xhr(url,method,body) });
+  }
+  return xhr(url,method,body);
+}
+function xhr(url,method,body){
+  return new Promise(function(res,rej){
+    var x=new XMLHttpRequest(); x.open(method,url,true);
+    if(body) x.setRequestHeader('Content-Type','application/json');
+    if(C.tk) x.setRequestHeader('Authorization','Bearer '+C.tk);
+    x.responseType='blob';
+    x.onload=function(){
+      if(x.status<200||x.status>=300){ rej(new Error('HTTP '+x.status)); return }
+      var ct=x.getResponseHeader('content-type')||'';
+      if(ct.indexOf('application/json')>=0){
+        var fr=new FileReader();
+        fr.onload=function(){ try{ res(JSON.parse(fr.result)) }catch(e){ rej(e) } };
+        fr.onerror=function(){ rej(new Error('解析失败')) };
+        fr.readAsText(x.response);
+      } else res(x.response);
+    };
+    x.onerror=function(){ rej(new Error('网络层失败')) };
+    x.ontimeout=function(){ rej(new Error('超时')) };
+    x.timeout=8000;
+    try{ x.send(body||null) }catch(e){ rej(e) }
+  });
+}
+function ok(){ $('#pill').className='pill on'; $('#ptxt').textContent='在线'; S.online=true }
+function bad(){ $('#pill').className='pill'; $('#ptxt').textContent='离线'; S.online=false }
+function health(){
+  return req('/api/health').then(function(d){ ok(); return d });
+}
+function probe(){
+  return health()['catch'](function(err){
+    bad();
+    if(!S.notified){ S.notified=true;
+      toast('连不上后端：'+err.message+'（已改用 XHR 通道，可在设置里测试）','er',4200);
+      show('set');
+      $('#diag').textContent='最后错误：'+err.message+' | 地址：'+base()+' | 通道：fetch→xhr'+(native()?' | 原生桥:已连接':' | 原生桥:无(网页模式)');
+    }
+    throw err;
+  });
+}
+function cmd(o){ return req('/api/control',{method:'POST',body:JSON.stringify(o)}); }
+
+/* 菜单 */
+$('#mb').addEventListener('click',function(e){ e.stopPropagation(); $('#dd').classList.toggle('op') });
+document.addEventListener('click',function(){ $('#dd').classList.remove('op') });
+var H={
+  live:function(){ show('live') },
+  shot:function(){ show('shot'); doShot() },
+  rec:function(){
+    if(!S.rec){ S.rec=true; S.frames=[]; $('[data-a=rec]').innerHTML='<span>⏹️</span>停止录像'; toast('开始录像','ok'); if(!S.stream) start() }
+    else { S.rec=false; $('[data-a=rec]').innerHTML='<span>⏺️</span>开始录像'; toast('录像结束，共 '+S.frames.length+' 帧','nf'); S.frames=[] }
+  },
+  ctrl:function(){ show('ctrl') },
+  tp:function(){ openTp() }, keys:function(){ openKeys() }, clip:function(){ openClip() }, msg:function(){ openMsg() }, shell:function(){ openShell() },
+  mt:function(){ show('file'); browse('mt','MT 目录') },
+  desk:function(){ show('file'); browse('desk','返回桌面') },
+  album:function(){ show('file'); browse('album','相册') },
+  dl:function(){ show('file'); browse('dl','下载目录') },
+  info:function(){ openBox('设备信息','/api/deviceinfo') },
+  log:function(){ openBox('运行日志','/api/logs') },
+  set:function(){ show('set') },
+  re:function(){ S.notified=false; probe().then(function(){ toast('已重新连接','ok') })['catch'](function(){}) }
+};
+document.querySelectorAll('[data-a]').forEach(function(el){
+  el.addEventListener('click',function(){ var a=el.dataset.a; $('#dd').classList.remove('op'); if(H[a]) H[a]() });
+});
+var MAP={live:'p-live',shot:'p-shot',file:'p-file',ctrl:'p-ctrl',set:'p-set'};
+function show(k){
+  Object.keys(MAP).forEach(function(x){ $('#'+MAP[x]).classList.toggle('sh', x===k) });
+  $('#p-dev').classList.toggle('sh', k==='dev');
+  document.querySelectorAll('.qc').forEach(function(c){ c.classList.toggle('ac', c.dataset.a===k) });
+  if(k!=='live') stop();
+}
+
+/* 设备 */
+function scan(){
+  $('#devList').innerHTML='<div class="ep">扫描中…</div>';
+  var rows=[{id:'local',name:'本机设备',status:'online'}];
+  req('/api/devices').then(function(d){
+    var arr=Array.isArray(d)?d:(d.devices||d.list||[]);
+    rows=rows.concat(arr); renderDev(rows);
+  })['catch'](function(){ renderDev(rows) });
+  $('#bScan').textContent='🔄 刷新';
+}
+function renderDev(rows){
+  if(!rows.length){ $('#devList').innerHTML='<div class="ep">未发现设备</div>'; return }
+  $('#devList').innerHTML=rows.map(function(d){
+    var on=(d.status||'online')==='online';
+    return '<div class="dv" data-id="'+d.id+'"><div class="av">📱</div><div><div class="nm">'+d.name+'</div><div class="st">'+(on?'在线':'离线')+' · '+d.id+'</div></div></div>';
+  }).join('');
+  $('#devList').querySelectorAll('.dv').forEach(function(el){
+    el.addEventListener('click',function(){
+      C.dv=el.dataset.id; save(); $('#cDv').value=C.dv;
+      toast('已选择设备：'+C.dv,'ok'); ncall('selectDevice',C.dv);
+      show('live');
+    });
+  });
+}
+$('#bScan').addEventListener('click',scan);
+
+/* 实时画面 */
+$('#bStart').addEventListener('click',start);
+$('#bStop').addEventListener('click',stop);
+$('#bRef').addEventListener('click',grab);
+function start(){
+  if(S.stream) return; S.stream=true;
+  $('#lb').textContent='直播中'; $('#lb').classList.add('on'); $('#ov').style.display='none'; $('#limg').style.display='block';
+  ncall('startStream',C.iv);
+  grab(); S.timer=setInterval(grab,C.iv);
+  toast('实时画面已开始','ok'); probe()['catch'](function(){});
+}
+function stop(){
+  S.stream=false; clearInterval(S.timer); S.timer=null; ncall('stopStream');
+  $('#lb').textContent='离线'; $('#lb').classList.remove('on'); $('#ov').style.display='flex'; $('#limg').style.display='none';
+}
+function grab(){
+  var u=base()+'/api/screenshot'+(C.dv?('?device_id='+encodeURIComponent(C.dv)):'');
+  var x=new XMLHttpRequest(); x.open('GET',u,true); if(C.tk) x.setRequestHeader('Authorization','Bearer '+C.tk);
+  x.responseType='blob';
+  x.onload=function(){
+    if(x.status<200||x.status>=300){ bad(); return }
+    ok();
+    var src=URL.createObjectURL(x.response);
+    $('#limg').src=src;
+    if(S.rec) S.frames.push(src);
+    if(C.auto) addShot(src);
+  };
+  x.onerror=function(){ bad() };
+  x.timeout=8000;
+  try{ x.send(null) }catch(e){}
+}
+window.onCinderFrame=function(d){ $('#limg').src=d; if(S.rec) S.frames.push(d); if(C.auto) addShot(d) };
+
+/* 截屏 */
+$('#bShot').addEventListener('click',doShot);
+function doShot(){
+  var u=base()+'/api/screenshot'+(C.dv?('?device_id='+encodeURIComponent(C.dv)):'');
+  var x=new XMLHttpRequest(); x.open('GET',u,true); if(C.tk) x.setRequestHeader('Authorization','Bearer '+C.tk);
+  x.responseType='blob';
+  x.onload=function(){
+    if(x.status<200||x.status>=300){ toast('截屏失败 HTTP '+x.status,'er'); return }
+    addShot(URL.createObjectURL(x.response)); toast('截图已保存','ok');
+  };
+  x.onerror=function(){ toast('截屏失败：网络层','er') };
+  x.timeout=8000; try{ x.send(null) }catch(e){}
+}
+function addShot(src){
+  var g=$('#gy'); if(g.querySelector('.ep')) g.innerHTML='';
+  var d=document.createElement('div'); d.className='gi';
+  d.innerHTML='<img src="'+src+'" alt="截图"><i>'+new Date().toLocaleTimeString('zh-CN')+'</i>';
+  d.querySelector('img').addEventListener('click',function(){ $('#mImgS').src=src; $('#mImg').classList.add('op') });
+  g.prepend(d);
+}
+
+/* 文件 */
+document.querySelectorAll('[data-g]').forEach(function(b){
+  b.addEventListener('click',function(){ show('file'); browse(b.dataset.g, b.textContent.trim()) });
+});
+var PMAP={mt:'/mt',desk:'/desktop',album:'/album',dl:'/downloads'};
+function browse(k,label){
+  var p=PMAP[k]||k;
+  $('#ftitle').textContent='📂 '+(label||p);
+  req('/api/files?path='+encodeURIComponent(p)+(C.dv?'&device_id='+encodeURIComponent(C.dv):'')).then(function(d){
+    renderFiles(Array.isArray(d)?d:(d.files||d.list||[]),p);
+  })['catch'](function(e){ $('#fl').innerHTML='<li class="ep">读取失败：'+e.message+'</li>' });
+  crumb(p);
+}
+function renderFiles(fs,base){
+  if(!fs.length){ $('#fl').innerHTML='<li class="ep">空目录</li>'; return }
+  $('#fl').innerHTML=fs.map(function(f){
+    var nm=typeof f==='string'?f:(f.name||''), dir=(typeof f==='object')&&(f.type==='dir'||f.isDir||nm.indexOf('.')<0);
+    var ico=dir?'📁':(/\.(jpe?g|png|gif|webp|bmp)$/i.test(nm)?'🖼️':/\.(mp4|avi|mkv|mov)$/i.test(nm)?'🎬':'📄');
+    var fp=(typeof f==='object'&&f.path)?f.path:(base+'/'+nm);
+    var sz=(typeof f==='object'&&f.size)?fmt(f.size):'', dt=(typeof f==='object'&&f.date)?new Date(f.date).toLocaleDateString('zh-CN'):'';
+    return '<li data-p="'+fp+'" data-t="'+(dir?'d':'f')+'"><span class="fi">'+ico+'</span><span class="fn">'+nm+'</span><span class="fs">'+sz+'</span><span class="fd">'+dt+'</span></li>';
+  }).join('');
+  $('#fl').querySelectorAll('li').forEach(function(li){
+    li.addEventListener('click',function(){
+      if(li.dataset.t==='d') browse(li.dataset.p, li.querySelector('.fn').textContent);
+      else toast('文件：'+li.dataset.p,'nf');
+    });
+  });
+}
+function crumb(p){
+  var ps=p.split('/').filter(Boolean),h='<u data-p="/">根目录</u>',a='';
+  ps.forEach(function(x){ a+='/'+x; h+='<u class="sp">›</u><u data-p="'+a+'">'+x+'</u>' });
+  $('#bc').innerHTML=h;
+  $('#bc').querySelectorAll('u:not(.sp)').forEach(function(u){ u.addEventListener('click',function(){ browse(u.dataset.p,u.textContent) }) });
+}
+function fmt(b){ if(!b&&b!==0) return ''; var u=['B','KB','MB','GB'],i=0,n=b; while(n>=1024&&i<3){n/=1024;i++} return n.toFixed(i?1:0)+u[i] }
+
+/* 控制 */
+document.querySelectorAll('[data-c]').forEach(function(b){
+  b.addEventListener('click',function(){
+    var c=b.dataset.c; ncall('control',c);
+    cmd({command:c,device_id:C.dv}).then(function(){ toast('指令已发送：'+c,'ok') })['catch'](function(){ toast('指令已发送（本机通道）','wr') });
+  });
+});
+
+/* 弹窗工具 */
+function modal(t,html){ $('#gT').textContent=t; $('#gB').innerHTML=html; $('#mGen').classList.add('op') }
+document.querySelectorAll('[data-close]').forEach(function(e){ e.addEventListener('click',function(){ e.closest('.mo').classList.remove('op') }) });
+document.querySelectorAll('.mo').forEach(function(m){ m.addEventListener('click',function(e){ if(e.target===m) m.classList.remove('op') }) });
+document.addEventListener('keydown',function(e){ if(e.key==='Escape') document.querySelectorAll('.mo').forEach(function(m){m.classList.remove('op')}) });
+var NMAP={single:1,double:2,long:3};
+function openTp(){
+  modal('触摸板 / 手势','<p>在下方滑动：单指移动，双指滚动，长按右键。动作转发到设备。</p>'+
+  '<canvas id="tp" width="320" height="220" style="width:100%;border:1px solid #22222e;border-radius:8px;background:#111;touch-action:none"></canvas>'+
+  '<div class="cr" style="margin-top:9px">'+['single:单击','double:双击','long:长按','scroll_up:上滚','scroll_down:下滚'].map(function(x){var k=x.split(':')[0],n=x.split(':')[1];return '<button class="cb" data-tap="'+k+'">'+n+'</button>'}).join('')+'</div>');
+  var c=$('#tp'),x=c.getContext('2d'),dn=false,lx=0,ly=0;
+  x.fillStyle='#111'; x.fillRect(0,0,320,220);
+  function P(e){ var r=c.getBoundingClientRect(),t=e.touches?e.touches[0]:e; return {x:(t.clientX-r.left)*320/r.width,y:(t.clientY-r.top)*220/r.height} }
+  function S2(e){ dn=true; var p=P(e); lx=p.x; ly=p.y }
+  function M(e){ if(!dn) return; var p=P(e); x.strokeStyle='#6c5ce7'; x.lineWidth=2; x.beginPath(); x.moveTo(lx,ly); x.lineTo(p.x,p.y); x.stroke(); lx=p.x; ly=p.y }
+  function E(e){ if(!dn) return; dn=false; var p=P(e); req('/api/input',{method:'POST',body:JSON.stringify({type:'swipe',from:{x:lx,y:ly},to:p,device_id:C.dv})})['catch'](function(){}) }
+  c.addEventListener('mousedown',S2); c.addEventListener('mousemove',M); window.addEventListener('mouseup',E);
+  c.addEventListener('touchstart',function(e){e.preventDefault();S2(e)},{passive:false});
+  c.addEventListener('touchmove',function(e){e.preventDefault();M(e)},{passive:false});
+  c.addEventListener('touchend',E);
+  $('#gB').querySelectorAll('[data-tap]').forEach(function(b){
+    b.addEventListener('click',function(){
+      var t=b.dataset.tap;
+      if(NMAP[t]) ncall('control',t);
+      req('/api/input',{method:'POST',body:JSON.stringify({type:'tap',gesture:t,device_id:C.dv})}).then(function(){ toast('已发送：'+b.textContent,'ok') })['catch'](function(){ toast('已发送（本机）','wr') });
+    });
+  });
+}
+function openKeys(){
+  modal('发送按键','<p>常用按键与组合键。</p><div class="cr">'+['HOME','BACK','RECENT','VOLUME_UP','VOLUME_DOWN','MUTE','POWER','LOCK','CAMERA','MENU','BRIGHTNESS_UP','BRIGHTNESS_DOWN'].map(function(k){return '<button class="cb" data-k="'+k+'">'+k+'</button>'}).join('')+'</div>'+
+  '<p style="margin-top:11px">文本输入</p><input id="kTx" placeholder="要输入的文字" style="width:100%;padding:9px;background:#11111a;border:1px solid #22222e;border-radius:9px;color:#eee">'+
+  '<div class="cr" style="margin-top:8px"><button class="cb" id="kGo">发送文本</button></div>');
+  $('#gB').querySelectorAll('[data-k]').forEach(function(b){ b.addEventListener('click',function(){
+    req('/api/input',{method:'POST',body:JSON.stringify({type:'key',key:b.dataset.k,device_id:C.dv})}).then(function(){ toast('按键已发送','ok') })['catch'](function(){ toast('按键已发送（本机）','wr') });
+  }) });
+  $('#kGo').addEventListener('click',function(){ var v=$('#kTx').value; if(!v) return;
+    req('/api/input',{method:'POST',body:JSON.stringify({type:'text',text:v,device_id:C.dv})}).then(function(){ toast('文本已发送','ok') })['catch'](function(){ toast('文本已发送（本机）','wr') });
+  });
+}
+function openClip(){
+  modal('剪贴板同步','<p>推送到远程，或拉取远程剪贴板。</p><textarea id="cp" rows="4" placeholder="剪贴板内容" style="width:100%;padding:9px;background:#11111a;border:1px solid #22222e;border-radius:9px;color:#eee"></textarea>'+
+  '<div class="cr" style="margin-top:9px"><button class="cb" id="cpP">⬆ 推送</button><button class="cb" id="cpL">⬇ 拉取</button></div>');
+  $('#cpP').addEventListener('click',function(){ req('/api/clipboard',{method:'POST',body:JSON.stringify({text:$('#cp').value,device_id:C.dv})}).then(function(){toast('已推送','ok')})['catch'](function(){toast('已推送（本机）','wr')}) });
+  $('#cpL').addEventListener('click',function(){ req('/api/clipboard'+(C.dv?('?device_id='+encodeURIComponent(C.dv)):'')).then(function(d){ $('#cp').value=(d&&d.text)?d.text:JSON.stringify(d); toast('已拉取','ok') })['catch'](function(){ toast('拉取失败','er') }) });
+}
+function openMsg(){
+  modal('弹窗消息','<p>在远程设备弹出一条提示。</p><input id="tM" placeholder="显示内容" style="width:100%;padding:9px;background:#11111a;border:1px solid #22222e;border-radius:9px;color:#eee">'+
+  '<div class="cr" style="margin-top:9px"><button class="cb" id="tGo">发送</button></div>');
+  $('#tGo').addEventListener('click',function(){ var v=$('#tM').value; if(!v) return;
+    req('/api/toast',{method:'POST',body:JSON.stringify({message:v,device_id:C.dv})}).then(function(){toast('已下发','ok')})['catch'](function(){ ncall('toastMsg',v); toast('已下发（本机）','wr') });
+  });
+}
+function openShell(){
+  modal('执行命令','<p>在远程设备执行命令（需后端开启）。</p><input id="sC" placeholder="例如：ls /sdcard" style="width:100%;padding:9px;background:#11111a;border:1px solid #22222e;border-radius:9px;color:#eee">'+
+  '<div class="cr" style="margin-top:9px"><button class="cb" id="sGo">▶ 执行</button></div><div class="lg" id="sO" style="margin-top:9px"></div>');
+  $('#sGo').addEventListener('click',function(){ var v=$('#sC').value; if(!v) return;
+    req('/api/shell',{method:'POST',body:JSON.stringify({cmd:v,device_id:C.dv})}).then(function(d){ $('#sO').textContent=typeof d==='string'?d:JSON.stringify(d,null,2) })['catch'](function(){ $('#sO').textContent='执行失败（后端未实现 /api/shell）' });
+  });
+}
+function openBox(t,path){
+  modal(t,'<div class="lg" id="bx">加载中…</div>');
+  req(path+(path.indexOf('?')>0?'&':'?')+'device_id='+encodeURIComponent(C.dv||'')).then(function(d){ $('#bx').textContent=typeof d==='string'?d:JSON.stringify(d,null,2) })['catch'](function(e){ $('#bx').textContent='获取失败：'+e.message+'（后端未实现该接口）' });
+}
+
+/* 设置 */
+$('#cBe').value=C.be; $('#cIv').value=C.iv; $('#cTk').value=C.tk; $('#cDv').value=C.dv;
+$('#cAuto').checked=C.auto; $('#cQuiet').checked=C.quiet;
+$('#bSave').addEventListener('click',function(){
+  C.be=$('#cBe').value.trim(); C.iv=parseInt($('#cIv').value,10)||2000; C.tk=$('#cTk').value.trim(); C.dv=$('#cDv').value.trim();
+  C.auto=$('#cAuto').checked; C.quiet=$('#cQuiet').checked; save(); toast('设置已保存','ok'); probe()['catch'](function(){});
+});
+$('#bTest').addEventListener('click',function(){
+  var p=C.be; C.be=$('#cBe').value.trim(); S.notified=false;
+  health().then(function(d){ ok(); toast('连接成功','ok'); $('#diag').textContent='连接成功：'+base()+' | 响应：'+JSON.stringify(d).slice(0,200)+(native()?' | 原生桥:已连接':' | 原生桥:无(网页模式)') })['catch'](function(e){ bad(); toast('连接失败：'+e.message,'er'); $('#diag').textContent='失败：'+e.message+' | 地址：'+base() });
+  C.be=p;
+});
+$('#diag').textContent='通道：fetch→xhr 自动降级'+(native()?' | 原生桥:已连接':' | 原生桥:无(网页模式)');
+
+/* 启动 */
+probe()['catch'](function(){}); scan();
+})();
+</script>
+</body>
+</html>
