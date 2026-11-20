@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#0a0a0f">
+<title>Cinder // 远程控制台</title>
+<style>
+:root{
+  --bg:#0a0a0f; --panel:rgba(255,255,255,.045); --line:rgba(255,255,255,.09);
+  --txt:#e9e9f2; --dim:#8a8a9c; --acc:#7c5cff; --acc2:#00d4ff;
+  --ok:#39e07a; --bad:#ff4d5e; --warn:#ffb02e; --r:16px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--txt); min-height:100vh;
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif;
+  padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  overflow-x:hidden;
+}
+.bg{position:fixed;inset:0;z-index:-1;background:
+  radial-gradient(38vw 38vw at 12% 8%,rgba(124,92,255,.20),transparent 60%),
+  radial-gradient(42vw 42vw at 88% 22%,rgba(0,212,255,.14),transparent 60%),
+  radial-gradient(50vw 50vw at 50% 95%,rgba(255,80,120,.10),transparent 60%),var(--bg);
+  animation:drift 18s ease-in-out infinite alternate}
+@keyframes drift{to{transform:translate3d(0,-14px,0) scale(1.04)}}
+
+/* 顶栏 */
+.top{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:10px;
+  padding:12px 14px;background:rgba(10,10,15,.72);backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--line)}
+.brand{font-size:19px;font-weight:800;letter-spacing:.3px;flex:1;min-width:0}
+.brand em{color:var(--acc);font-style:normal;margin:0 4px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;
+  padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--bad);box-shadow:0 0 8px currentColor}
+.pill.on .dot{background:var(--ok)}
+.pill.ing .dot{background:var(--warn)}
+.iconbtn{width:38px;height:38px;display:grid;place-items:center;border-radius:12px;
+  border:1px solid var(--line);background:var(--panel);color:var(--txt);font-size:18px;cursor:pointer}
+.iconbtn:active{transform:scale(.94)}
+
+.wrap{padding:14px 14px 90px;max-width:720px;margin:0 auto}
+
+/* 快捷卡片 */
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:14px}
+.card{position:relative;border:1px solid var(--line);background:var(--panel);border-radius:var(--r);
+  padding:18px 10px;display:flex;flex-direction:column;align-items:center;gap:9px;cursor:pointer;
+  transition:.18s;overflow:hidden}
+.card:active{transform:scale(.97)}
+.card .ic{font-size:26px;line-height:1}
+.card .lb{font-size:14px;font-weight:700}
+.card.half{grid-column:span 1}
+.card.full{grid-column:1/-1}
+.card.act{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc),0 0 26px rgba(124,92,255,.28)}
+
+/* 面板 */
+.panel{border:1px solid var(--line);background:var(--panel);border-radius:var(--r);
+  margin-bottom:12px;overflow:hidden}
+.ph{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line);
+  font-size:14px;font-weight:700}
+.ph .sp{margin-left:auto;display:flex;gap:7px}
+.pb{padding:12px 14px}
+.hint{font-size:12px;color:var(--dim);line-height:1.6}
+[hidden]{display:none!important}
+
+button,.btn{font-family:inherit}
+.btn{border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--txt);
+  padding:9px 13px;border-radius:11px;font-size:13px;font-weight:700;cursor:pointer}
+.btn:active{transform:scale(.96)}
+.btn.pri{background:linear-gradient(135deg,var(--acc),var(--acc2));border-color:transparent;color:#0a0a0f}
+.btn.dan{border-color:rgba(255,77,94,.45);color:#ff8b96}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+input,select{width:100%;font-family:inherit;font-size:13px;color:var(--txt);
+  background:rgba(0,0,0,.28);border:1px solid var(--line);border-radius:11px;padding:10px 11px}
+input:focus,select:focus{outline:none;border-color:var(--acc)}
+.fld{margin-bottom:10px}
+.fld label{display:block;font-size:11px;color:var(--dim);margin-bottom:5px;font-weight:700}
+
+/* 画面 */
+#live{width:100%;display:block;border-radius:11px;background:#000;aspect-ratio:9/16;object-fit:contain}
+.stage{position:relative}
+.stage .tag{position:absolute;left:9px;top:9px;font-size:10px;font-weight:800;letter-spacing:1px;
+  padding:3px 7px;border-radius:7px;background:rgba(0,0,0,.55);color:var(--ok)}
+.stage.stop .tag{color:var(--bad)}
+
+/* 设备 */
+.dev{display:flex;align-items:center;gap:11px;padding:11px;border-radius:12px;
+  border:1px solid var(--line);background:rgba(255,255,255,.03);margin-bottom:8px;cursor:pointer}
+.dev:active{transform:scale(.99)}
+.dev .av{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;font-size:18px;
+  background:linear-gradient(135deg,var(--acc),var(--acc2))}
+.dev .nm{font-size:14px;font-weight:700}
+.dev .sb{font-size:11px;color:var(--dim);margin-top:2px}
+.dev.cur{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
+
+/* 文件 */
+.crumb{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--dim);margin-bottom:9px;
+  overflow-x:auto;white-space:nowrap;padding-bottom:2px}
+.crumb b{color:var(--acc2);cursor:pointer;font-weight:700}
+.fi{display:flex;align-items:center;gap:9px;padding:9px;border-radius:10px;font-size:13px;
+  border-bottom:1px solid rgba(255,255,255,.05)}
+.fi:last-child{border-bottom:none}
+.fi .fn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.fi .fs{font-size:11px;color:var(--dim)}
+
+/* 画廊 */
+.gal{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
+.gal img{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:9px;background:#111}
+
+/* 日志 */
+.log{font:11px/1.65 ui-monospace,Menlo,Consolas,monospace;color:#a9f7c6;
+  background:rgba(0,0,0,.35);border-radius:11px;padding:10px;max-height:210px;overflow:auto;white-space:pre-wrap}
+
+/* 抽屉 */
+.mask{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(3px);z-index:50;opacity:0;pointer-events:none;transition:.2s}
+.mask.on{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:84%;max-width:330px;z-index:60;
+  background:rgba(16,16,22,.96);backdrop-filter:blur(18px);border-left:1px solid var(--line);
+  transform:translateX(102%);transition:.25s cubic-bezier(.3,.8,.2,1);display:flex;flex-direction:column}
+.drawer.on{transform:none}
+.dh{padding:14px;border-bottom:1px solid var(--line);font-weight:800;font-size:15px}
+.db{flex:1;overflow:auto;padding:8px}
+.mi{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:11px;font-size:14px;cursor:pointer}
+.mi:active{background:rgba(255,255,255,.06)}
+.mi .ic{font-size:17px;width:20px;text-align:center}
+.mi .ar{margin-left:auto;color:var(--dim);font-size:11px}
+.sep{height:1px;background:var(--line);margin:7px 10px}
+.dsec{font-size:10px;color:var(--dim);font-weight:800;letter-spacing:1.4px;padding:9px 12px 4px}
+
+/* Toast */
+.toasts{position:fixed;left:0;right:0;bottom:calc(16px + env(safe-area-inset-bottom));z-index:90;
+  display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;padding:0 14px}
+.tst{max-width:92%;font-size:13px;font-weight:600;padding:10px 14px;border-radius:12px;
+  border:1px solid var(--line);background:rgba(20,20,27,.95);backdrop-filter:blur(10px);
+  box-shadow:0 10px 30px rgba(0,0,0,.45);animation:up .22s ease}
+.tst.bad{border-color:rgba(255,77,94,.5);color:#ffb3bb}
+.tst.ok{border-color:rgba(57,224,122,.45);color:#a9f7c6}
+@keyframes up{from{opacity:0;transform:translateY(12px)}}
+
+/* 大图 */
+.viewer{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.93);display:none;place-items:center;padding:16px}
+.viewer.on{display:grid}
+.viewer img{max-width:100%;max-height:86%;border-radius:12px}
+.viewer .cl{position:absolute;top:14px;right:14px}
+</style>
+</head>
+<body>
+<div class="bg"></div>
+
+<div class="top">
+  <div class="brand">Cinder <em>//</em> 远程控制台</div>
+  <div class="pill ing" id="pill"><span class="dot"></span><span id="pillTxt">检测中…</span></div>
+  <button class="iconbtn" id="btnMenu">☰</button>
+</div>
+
+<div class="wrap">
+
+  <div class="grid">
+    <div class="card full act" data-go="live"><span class="ic">📡</span><span class="lb">实时画面</span></div>
+    <div class="card half" data-act="shot"><span class="ic">📸</span><span class="lb">截屏</span></div>
+    <div class="card half" data-go="ctrl"><span class="ic">🎮</span><span class="lb">控制</span></div>
+    <div class="card half" data-act="mt"><span class="ic">📁</span><span class="lb">MT 目录</span></div>
+    <div class="card half" data-act="album"><span class="ic">🖼️</span><span class="lb">相册</span></div>
+  </div>
+
+  <!-- 实时画面 -->
+  <div class="panel" id="p-live">
+    <div class="ph">📡 实时画面
+      <div class="sp">
+        <button class="btn pri" id="liveStart">开始</button>
+        <button class="btn" id="liveStop">停止</button>
+        <button class="btn" id="liveOnce">刷新</button>
+      </div>
+    </div>
+    <div class="pb">
+      <div class="stage stop" id="stage">
+        <img id="live" alt="实时画面">
+        <span class="tag">已停止</span>
+      </div>
+      <div class="hint" style="margin-top:9px">点「开始」按设定间隔拉流；拉不到图会显示原因，不会刷屏。</div>
+    </div>
+  </div>
+
+  <!-- 控制 -->
+  <div class="panel" id="p-ctrl" hidden>
+    <div class="ph">🎮 远程控制</div>
+    <div class="pb">
+      <div class="row" style="margin-bottom:9px">
+        <button class="btn" data-c="lock">锁屏</button>
+        <button class="btn" data-c="unlock">解锁</button>
+        <button class="btn pri" data-c="home">主页</button>
+        <button class="btn" data-c="back">返回</button>
+        <button class="btn" data-c="recent">最近任务</button>
+        <button class="btn" data-c="vol_up">音量+</button>
+        <button class="btn" data-c="vol_down">音量−</button>
+        <button class="btn dan" data-c="reboot">重启</button>
+      </div>
+      <div class="fld">
+        <label>触摸板（滑动 = 方向键，点按 = 确认）</label>
+        <div id="pad" style="height:132px;border-radius:12px;border:1px dashed var(--line);
+             background:repeating-linear-gradient(45deg,rgba(255,255,255,.02) 0 8px,transparent 8px 16px);
+             display:grid;place-items:center;font-size:12px;color:var(--dim);touch-action:none">触摸区</div>
+      </div>
+      <div class="row">
+        <button class="btn" id="clipSend">发送剪贴板</button>
+        <button class="btn" id="clipGet">读取远端剪贴板</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 文件 -->
+  <div class="panel" id="p-file" hidden>
+    <div class="ph">📂 <span id="fileTitle">文件浏览</span>
+      <div class="sp"><button class="btn" id="fileUp">上级</button><button class="btn" id="fileReload">刷新</button></div>
+    </div>
+    <div class="pb">
+      <div class="crumb" id="crumb">—</div>
+      <div id="fileList"><div class="hint">选择左侧快捷目录，或点上方卡片。</div></div>
+    </div>
+  </div>
+
+  <!-- 截屏画廊 -->
+  <div class="panel" id="p-gal" hidden>
+    <div class="ph">🖼️ 截屏画廊 <div class="sp"><button class="btn" id="galReload">刷新</button></div></div>
+    <div class="pb"><div class="gal" id="gal"></div></div>
+  </div>
+
+  <!-- 设备 -->
+  <div class="panel">
+    <div class="ph">📱 设备列表 <div class="sp"><button class="btn" id="devReload">刷新</button></div></div>
+    <div class="pb">
+      <div id="devs">
+        <div class="dev cur" data-id="local" data-name="本机设备">
+          <div class="av">📱</div>
+          <div><div class="nm">本机设备</div><div class="sb">在线 · local</div></div>
+        </div>
+      </div>
+      <div class="hint">后端 <b>/api/devices</b> 返回的在线设备会追加到下方，点一下切换。</div>
+    </div>
+  </div>
+
+  <!-- 设置 -->
+  <div class="panel" id="p-set">
+    <div class="ph">⚙️ 设置</div>
+    <div class="pb">
+      <div class="fld"><label>后端地址（根地址即可，自动补 /api）</label>
+        <input id="cfgBase" value="https://cinder-brain-ops.onrender.com"></div>
+      <div class="fld"><label>鉴权令牌（可留空）</label><input id="cfgToken" placeholder="Bearer token，可选"></div>
+      <div class="fld"><label>实时画面刷新间隔（毫秒）</label>
+        <select id="cfgRate">
+          <option value="800">800（流畅）</option>
+          <option value="1500" selected>1500（推荐）</option>
+          <option value="3000">3000（省流量）</option>
+        </select></div>
+      <div class="row">
+        <button class="btn pri" id="saveCfg">保存</button>
+        <button class="btn" id="testCfg">测试连接</button>
+        <button class="btn" id="reconn">重新连接</button>
+      </div>
+      <div class="hint" style="margin-top:9px" id="diag">诊断：等待检测…</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="ph">📟 运行日志</div>
+    <div class="pb"><div class="log" id="log">[系统] 控制台已加载。后端根地址：https://cinder-brain-ops.onrender.com\n</div></div>
+  </div>
+</div>
+
+<!-- 抽屉菜单 -->
+<div class="mask" id="mask"></div>
+<div class="drawer" id="drawer">
+  <div class="dh">功能菜单</div>
+  <div class="db">
+    <div class="dsec">实时</div>
+    <div class="mi" data-go="live"><span class="ic">📡</span>实时画面<span class="ar">播放</span></div>
+    <div class="mi" data-act="shot"><span class="ic">📸</span>截屏<span class="ar">立即</span></div>
+    <div class="mi" data-act="gal"><span class="ic">🖼️</span>截屏画廊<span class="ar">查看</span></div>
+    <div class="sep"></div>
+    <div class="dsec">控制</div>
+    <div class="mi" data-go="ctrl"><span class="ic">🎮</span>控制面板<span class="ar">按键</span></div>
+    <div class="mi" data-act="gesture"><span class="ic">👆</span>触摸板 · 手势</div>
+    <div class="mi" data-act="keys"><span class="ic">⌨️</span>发送按键</div>
+    <div class="mi" data-act="clip"><span class="ic">📋</span>剪贴板同步</div>
+    <div class="mi" data-act="notify"><span class="ic">💬</span>弹窗消息</div>
+    <div class="mi" data-act="exec"><span class="ic">⌨</span>执行命令</div>
+    <div class="sep"></div>
+    <div class="dsec">文件</div>
+    <div class="mi" data-act="mt"><span class="ic">📁</span>查看 MT 目录</div>
+    <div class="mi" data-act="desktop"><span class="ic">🖥️</span>返回桌面</div>
+    <div class="mi" data-act="album"><span class="ic">🖼️</span>查看相册</div>
+    <div class="mi" data-act="download"><span class="ic">⬇️</span>下载目录</div>
+    <div class="sep"></div>
+    <div class="dsec">设备</div>
+    <div class="mi" data-act="info"><span class="ic">ℹ️</span>设备信息</div>
+    <div class="mi" data-act="log"><span class="ic">📟</span>运行日志</div>
+    <div class="mi" data-act="a11y"><span class="ic">♿</span>无障碍设置</div>
+    <div class="sep"></div>
+    <div class="dsec">系统</div>
+    <div class="mi" data-go="set"><span class="ic">⚙️</span>设置</div>
+    <div class="mi" data-act="reconn2"><span class="ic">🔄</span>重新连接</div>
+    <div class="mi" data-act="ui"><span class="ic">🌐</span>打开后端控制台 /ui</div>
+  </div>
+</div>
+
+<div class="viewer" id="viewer"><img id="viewerImg" src="" alt=""><button class="btn cl" id="viewerClose">关闭 ✕</button></div>
+<div class="toasts" id="toasts"></div>
+
+<script>
+(function(){
+"use strict";
+
+var DEFAULTS={base:"https://cinder-brain-ops.onrender.com",token:"",rate:"1500"};
+var CFG={};
+try{var s=JSON.parse(localStorage.getItem("cinder_cfg")||"null");CFG=s||DEFAULTS;}catch(e){CFG=DEFAULTS;}
+
+var STATE={online:null,live:false,timer:null,dev:"local",devName:"本机设备",path:"",lastErr:""};
+
+/* ---------- 工具 ---------- */
+function $(id){return document.getElementById(id);}
+function esc(t){return String(t==null?"":t).replace(/[&<>"]/g,function(c){return({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c];});}
+function toast(msg,type){
+  var d=document.createElement("div");
+  d.className="tst"+(type?" "+type:""); d.textContent=msg;
+  $("toasts").appendChild(d);
+  setTimeout(function(){d.style.opacity="0";d.style.transition=".25s";setTimeout(function(){d.remove();},260);},2400);
+}
+function logline(m){
+  var el=$("log"); el.textContent+="\n["+new Date().toLocaleTimeString("zh-CN",{hour12:false})+"] "+m;
+  el.scrollTop=el.scrollHeight;
+}
+function bridge(){return (window.AndroidBridge||window.NativeBridge||null);}
+function headers(){
+  var h={}; if(CFG.token){ h["Authorization"]=CFG.token.indexOf(" ")>0?CFG.token:"Bearer "+CFG.token; }
+  return h;
+}
+function root(){return (CFG.base||"").replace(/\/+$/,"");}
+function apiPaths(p){ // 兼容多种后端路由形态
+  var r=root();
+  if(/^(https?:)?\/\//i.test(p)) return [p];
+  var n=p.replace(/^\/+/,"");
+  var out=[];
+  if(n.indexOf("api/")===0||n.indexOf("healthz")===0){ out.push(r+"/"+n); }
+  else { out.push(r+"/api/"+n); out.push(r+"/"+n); }
+  return out.filter(function(v,i,a){return a.indexOf(v)===i;});
+}
+function request(path,opts){
+  opts=opts||{};
+  var list=apiPaths(path), i=0, errors=[];
+  function attempt(){
+    if(i>=list.length){
+      STATE.lastErr=errors.join(" | ")||"网络层失败";
+      logline("× "+path+" → "+STATE.lastErr);
+      return Promise.reject(new Error(STATE.lastErr));
+    }
+    var url=list[i++];
+    var b=bridge();
+    if(b&&typeof b.request==="function"){
+      try{
+        var r=b.request(url,opts.method||"GET",opts.body||"",JSON.stringify(headers()));
+        if(r&&typeof r.then==="function") return r.then(function(x){return {text:String(x),url:url};},function(e){errors.push("bridge:"+e);return attempt();});
+        return Promise.resolve({text:String(r),url:url});
+      }catch(e){ errors.push("bridge-ex:"+e.message); }
+    }
+    return new Promise(function(resolve){
+      try{
+        var xhr=new XMLHttpRequest();
+        xhr.open(opts.method||"GET",url,true);
+        xhr.timeout=8000;
+        var k; for(k in headers()) xhr.setRequestHeader(k,headers()[k]);
+        if(opts.body&&opts.json!==false) xhr.setRequestHeader("Content-Type","application/json");
+        xhr.onload=function(){
+          if(xhr.status>=200&&xhr.status<300) resolve({text:xhr.responseText,url:url});
+          else { errors.push(url+" HTTP "+xhr.status); attempt().then(resolve,function(){resolve(null);}); }
+        };
+        xhr.onerror=function(){ errors.push(url+" 网络错误"); attempt().then(resolve,function(){resolve(null);}); };
+        xhr.ontimeout=function(){ errors.push(url+" 超时"); attempt().then(resolve,function(){resolve(null);}); };
+        xhr.send(opts.body||null);
+      }catch(e){ errors.push(url+" "+e.message); attempt().then(resolve,function(){resolve(null);}); }
+    }).then(function(res){
+      if(!res) throw new Error(errors.join(" | ")||"网络层失败");
+      return res;
+    });
+  }
+  return attempt();
+}
+function getJSON(path){ return request(path).then(function(r){ try{return JSON.parse(r.text);}catch(e){ return {raw:r.text}; } }); }
+function post(path,body){ return request(path,{method:"POST",json:true,body:JSON.stringify(body||{})}); }
+
+/* ---------- 状态 ---------- */
+function setPill(state,txt){
+  var p=$("pill"); p.className="pill"+(state==="on"?" on":(state==="ing"?" ing":""));
+  $("pillTxt").textContent=txt;
+}
+function checkHealth(silent){
+  setPill("ing","检测中…");
+  return getJSON("healthz").then(function(d){
+    STATE.online=true;
+    setPill("on","在线");
+    $("diag").innerHTML='诊断：✅ 连通。<br>探测地址：'+esc((d&&d._url)||"")+'<br>响应：'+esc(JSON.stringify(d).slice(0,160));
+    if(!silent){ toast("连接成功","ok"); }
+    logline("✓ /healthz 连通");
+    loadDevices();
+    return true;
+  },function(e){
+    STATE.online=false;
+    setPill("off","离线");
+    $("diag").innerHTML='诊断：❌ 连不上后端。<br>原因：'+esc(e.message)+'<br>说明：先用浏览器打开 '+esc(root())+' 确认服务在跑；本地文件打开会受跨域限制，建议挂成 https 或装 APK。';
+    if(!silent){ toast("连不上后端：网络层失败（已改用 XHR 通道，可在设置里测试）","bad"); }
+    return false;
+  });
+}
+function loadDevices(){
+  return getJSON("devices").then(function(d){
+    var arr = Array.isArray(d)?d:(d&&(d.devices||d.list||d.data))||[];
+    var html="";
+    arr.forEach(function(x){
+      var id=x.id||x.deviceId||x.name||"dev";
+      var nm=x.name||x.label||id;
+      var st=(x.status||(x.online?"online":""))||"online";
+      html+='<div class="dev" data-id="'+esc(id)+'" data-name="'+esc(nm)+'">'+
+            '<div class="av">'+(String(nm).indexOf("PC")>=0||String(nm).indexOf("Win")>=0?"💻":"📱")+'</div>'+
+            '<div><div class="nm">'+esc(nm)+'</div><div class="sb">'+esc(st)+' · '+esc(id)+'</div></div></div>';
+    });
+    if(!html) html='<div class="hint">后端未返回其他设备，仅显示本机。</div>';
+    $("devs").innerHTML=html;
+    bindDevs();
+  },function(){ /* 静默：设备接口可有可无 */ });
+}
+function bindDevs(){
+  Array.prototype.forEach.call($("devs").querySelectorAll(".dev"),function(el){
+    el.onclick=function(){
+      Array.prototype.forEach.call($("devs").querySelectorAll(".dev"),function(o){o.classList.remove("cur");});
+      el.classList.add("cur");
+      STATE.dev=el.getAttribute("data-id"); STATE.devName=el.getAttribute("data-name")||"设备";
+      toast("已切换到 "+STATE.devName,"ok");
+    };
+  });
+}
+
+/* ---------- 实时画面 ---------- */
+function grab(){
+  return request("screenshot",{method:"GET"}).then(function(){
+    var b=bridge();
+    if(b&&typeof b.screenshot==="function"){ return b.screenshot(); }
+    return new Promise(function(resolve,reject){
+      var url=apiPaths("screenshot")[0], xhr=new XMLHttpRequest();
+      xhr.open("GET",url,true); xhr.timeout=8000;
+      var k; for(k in headers()) xhr.setRequestHeader(k,headers()[k]);
+      xhr.responseType="blob";
+      xhr.onload=function(){
+        if(xhr.status>=200&&xhr.status<300){
+          var fr=new FileReader();
+          fr.onload=function(){ resolve(fr.result); };
+          fr.onerror=function(){ reject(new Error("读取图片失败")); };
+          fr.readAsDataURL(xhr.response);
+        } else reject(new Error("HTTP "+xhr.status));
+      };
+      xhr.onerror=function(){ reject(new Error("网络错误")); };
+      xhr.ontimeout=function(){ reject(new Error("超时")); };
+      xhr.send(null);
+    });
+  }).then(function(dataUri){
+    $("live").src=dataUri;
+    $("stage").classList.remove("stop");
+    $("stage").querySelector(".tag").textContent="实时 · "+new Date().toLocaleTimeString("zh-CN",{hour12:false});
+  });
+}
+function liveTick(){
+  grab().catch(function(e){
+    $("stage").classList.add("stop");
+    $("stage").querySelector(".tag").textContent="未连接";
+    if(STATE.live) toast("拉流失败："+e.message,"bad");
+    logline("× 拉流失败："+e.message);
+  });
+}
+function liveStart(){
+  STATE.live=true;
+  $("stage").querySelector(".tag").textContent="连接中…";
+  liveTick();
+  clearInterval(STATE.timer);
+  STATE.timer=setInterval(liveTick,Math.max(500,parseInt(CFG.rate,10)||1500));
+  toast("实时画面已启动","ok");
+}
+function liveStop(){
+  STATE.live=false; clearInterval(STATE.timer);
+  $("stage").classList.add("stop");
+  $("stage").querySelector(".tag").textContent="已停止";
+  toast("已停止");
+}
+
+/* ---------- 文件 ---------- */
+var SHORTCUTS={mt:["/mt","/data/data/com.topjohnwu.magisk","/sdcard/Android/data"],
+               desktop:["/desktop","/sdcard/Desktop","/sdcard"],
+               album:["/album","/sdcard/DCIM","/sdcard/Pictures"],
+               download:["/download","/sdcard/Download"]};
+function browse(key){
+  var list=SHORTCUTS[key]||[key];
+  $("p-file").hidden=false; $("fileTitle").textContent=key;
+  $("fileList").innerHTML='<div class="hint">加载中…</div>';
+  var i=0;
+  (function next(){
+    if(i>=list.length){ $("fileList").innerHTML='<div class="hint">该目录取不到（后端未实现 /api/files 或路径不存在）。</div>'; return; }
+    var p=list[i++];
+    getJSON("files?path="+encodeURIComponent(p)).then(function(d){
+      var arr=Array.isArray(d)?d:(d.files||d.list||d.data||[]);
+      if(!arr.length) throw new Error("空");
+      STATE.path=p;
+      $("crumb").innerHTML='<b data-p="'+esc(p)+'">'+esc(p)+'</b>';
+      Array.prototype.forEach.call($("crumb").querySelectorAll("b"),function(b){
+        b.onclick=function(){ browse(b.getAttribute("data-p")); };
+      });
+      $("fileList").innerHTML=arr.map(function(f){
+        var isDir=(f.type==="dir"||f.isDir);
+        return '<div class="fi" data-p="'+esc(f.path||(p+"/"+f.name))+'" data-dir="'+(isDir?1:"")+'">'+
+               '<span>'+(isDir?"📁":"📄")+'</span><span class="fn">'+esc(f.name||f.path)+'</span>'+
+               '<span class="fs">'+(isDir?"":(f.size||"")+"")+'</span></div>';
+      }).join("");
+      Array.prototype.forEach.call($("fileList").querySelectorAll(".fi"),function(el){
+        el.onclick=function(){
+          if(el.getAttribute("data-dir")==="1") browse(el.getAttribute("data-p"));
+          else toast("暂不支持下载该文件："+el.querySelector(".fn").textContent);
+        };
+      });
+    },function(){ next(); });
+  })();
+}
+function gallery(){
+  $("p-gal").hidden=false;
+  $("gal").innerHTML='<div class="hint">加载中…</div>';
+  getJSON("screenshots").then(function(d){
+    var arr=(Array.isArray(d)?d:(d.list||d.data||[]));
+    if(!arr.length) throw new Error("空");
+    $("gal").innerHTML=arr.slice(0,24).map(function(x){
+      var u=x.url||x.path||x.name;
+      return '<img src="'+esc(/^https?:/i.test(u)?u:(root()+"/api/file?path="+encodeURIComponent(x.path||x.name)))+'" alt="">';
+    }).join("");
+    Array.prototype.forEach.call($("gal").querySelectorAll("img"),function(im){
+      im.onerror=function(){ im.style.opacity=".25"; };
+      im.onclick=function(){ $("viewerImg").src=im.src; $("viewer").classList.add("on"); };
+    });
+  },function(){ $("gal").innerHTML='<div class="hint">没有取到截图（后端 /api/screenshots 未实现或目录为空）。</div>'; });
+}
+function doShot(){
+  toast("正在截屏…");
+  grab().then(function(d){
+    toast("截图已保存","ok");
+    var a=document.createElement("a"); a.href=d; a.download="cinder_"+Date.now()+".jpg"; a.click();
+  },function(e){ toast("截屏失败："+e.message,"bad"); });
+}
+
+/* ---------- 控制 ---------- */
+function sendCmd(c){
+  var map={vol_up:"volume_up",vol_down:"volume_down"};
+  var body={command:map[c]||c,action:map[c]||c,key:c,device:STATE.dev};
+  var b=bridge();
+  if(b&&typeof b.control==="function"){
+    try{ if(b.control(JSON.stringify(body))) { toast("指令已发送："+c,"ok"); logline("→ 原生控制 "+c); return; } }catch(e){}
+  }
+  post("control",body).then(function(){ toast("指令已发送："+c,"ok"); logline("→ /api/control "+c); },
+                             function(e){ toast("指令失败："+e.message,"bad"); });
+}
+function promptBox(title,ph,cb){
+  var v=window.prompt(title,ph||"");
+  if(v!==null&&v!=="") cb(v);
+}
+function menuAct(a){
+  switch(a){
+    case "shot": doShot(); break;
+    case "gal": gallery(); break;
+    case "mt": browse("mt"); break;
+    case "desktop": browse("desktop"); break;
+    case "album": browse("album"); break;
+    case "download": browse("download"); break;
+    case "gesture":
+      $("p-ctrl").hidden=false;
+      $("p-ctrl").scrollIntoView({behavior:"smooth",block:"center"});
+      toast("在触摸区滑动或点按"); break;
+    case "keys":
+      promptBox("发送按键","例如 HOME / BACK / VOLUME_UP / 文本",function(v){
+        sendCmd(/^[A-Z_]+$/.test(v)?"key_"+v.toLowerCase():"text");
+        if(!/^[A-Z_]+$/.test(v)) post("input",{text:v}).then(function(){toast("文本已发送","ok");},function(e){toast("失败："+e.message,"bad");});
+      }); break;
+    case "clip":
+      promptBox("要同步到远端的剪贴板内容","",function(v){
+        post("clipboard",{text:v}).then(function(){toast("已推送","ok");},function(e){toast("失败："+e.message,"bad");});
+      }); break;
+    case "notify":
+      promptBox("弹窗消息内容","Cinder 提醒你",function(v){
+        post("notify",{title:"Cinder",text:v}).then(function(){toast("已推送","ok");},function(e){toast("失败："+e.message,"bad");});
+      }); break;
+    case "exec":
+      promptBox("执行命令（需后端支持）","su -c 'ls /data/data'",function(v){
+        post("exec",{cmd:v,command:v}).then(function(){toast("已下发","ok");},function(e){toast("失败："+e.message,"bad");});
+      }); break;
+    case "info":
+      getJSON("info").then(function(d){ alert(JSON.stringify(d,null,2)); },function(e){ toast("取不到设备信息："+e.message,"bad"); }); break;
+    case "log": $("log").scrollIntoView({behavior:"smooth"}); break;
+    case "a11y":
+      (function(){ var b=bridge(); if(b&&typeof b.openAccessibility==="function") b.openAccessibility();
+                   else toast("网页模式无无障碍服务，装 APK 后可用","bad"); })(); break;
+    case "reconn2": case "reconn": checkHealth(); break;
+    case "ui": window.open(root()+"/ui","_blank"); break;
+  }
+}
+function goto(p){
+  var map={live:"p-live",ctrl:"p-ctrl",set:"p-set"};
+  Object.keys(map).forEach(function(k){ $(map[k]).hidden=(k!==p); });
+  if(p==="live"&&!STATE.live) liveStart();
+  var el=$(map[p]); if(el) el.scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+/* ---------- 事件绑定 ---------- */
+Array.prototype.forEach.call(document.querySelectorAll("[data-go]"),function(el){
+  el.onclick=function(){
+    var g=el.getAttribute("data-go");
+    if(el.classList.contains("card")){
+      Array.prototype.forEach.call(document.querySelectorAll(".card"),function(c){c.classList.remove("act");});
+      el.classList.add("act");
+      if(g==="live") goto("live");
+      else if(g==="ctrl"){ goto("ctrl"); }
+      else if(g==="set"){ $("p-set").hidden=false; }
+    } else { closeMenu(); goto(g); }
+  };
+});
+Array.prototype.forEach.call(document.querySelectorAll("[data-act]"),function(el){
+  el.onclick=function(){ closeMenu(); menuAct(el.getAttribute("data-act")); };
+});
+Array.prototype.forEach.call(document.querySelectorAll("[data-c]"),function(el){
+  el.onclick=function(){ sendCmd(el.getAttribute("data-c")); };
+});
+$("liveStart").onclick=liveStart;
+$("liveStop").onclick=liveStop;
+$("liveOnce").onclick=function(){ liveTick(); };
+$("devReload").onclick=function(){ loadDevices(); toast("已刷新"); };
+$("galReload").onclick=gallery;
+$("fileReload").onclick=function(){ if(STATE.path) browse(STATE.path); else browse("desktop"); };
+$("fileUp").onclick=function(){
+  if(!STATE.path) return;
+  var p=STATE.path.replace(/\/+$/,"").split("/"); p.pop();
+  if(p.length>1) browse(p.join("/"));
+};
+$("viewerClose").onclick=function(){ $("viewer").classList.remove("on"); };
+function openMenu(){ $("drawer").classList.add("on"); $("mask").classList.add("on"); }
+function closeMenu(){ $("drawer").classList.remove("on"); $("mask").classList.remove("on"); }
+$("btnMenu").onclick=function(){ $("drawer").classList.contains("on")?closeMenu():openMenu(); };
+$("mask").onclick=closeMenu;
+function saveCfg(){
+  CFG.base=$("cfgBase").value.trim()||DEFAULTS.base;
+  CFG.token=$("cfgToken").value.trim();
+  CFG.rate=$("cfgRate").value;
+  try{ localStorage.setItem("cinder_cfg",JSON.stringify(CFG)); }catch(e){}
+  toast("已保存"); logline("配置已保存："+CFG.base);
+}
+$("saveCfg").onclick=saveCfg;
+$("testCfg").onclick=function(){ saveCfg(); checkHealth(); };
+$("reconn").onclick=function(){ checkHealth(); };
+
+/* 触摸板 */
+(function(){
+  var pad=$("pad"), sx=0, sy=0, active=false;
+  function pos(e){ var t=e.touches?e.touches[0]:e; return {x:t.clientX,y:t.clientY}; }
+  pad.addEventListener("touchstart",function(e){ var p=pos(e); sx=p.x; sy=p.y; active=true; },{passive:true});
+  pad.addEventListener("touchmove",function(e){
+    if(!active) return; var p=pos(e), dx=p.x-sx, dy=p.y-sy;
+    if(Math.abs(dx)>26&&Math.abs(dx)>Math.abs(dy)) sendCmd(dx>0?"swipe_right":"swipe_left");
+    else if(Math.abs(dy)>26) sendCmd(dy>0?"swipe_down":"swipe_up");
+    sx=p.x; sy=p.y;
+  },{passive:true});
+  pad.addEventListener("touchend",function(e){ if(active) sendCmd("tap"); active=false; },{passive:true});
+  pad.addEventListener("mousedown",function(e){ sx=e.clientX; sy=e.clientY; active=true; });
+  pad.addEventListener("mouseup",function(e){
+    if(!active) return;
+    var dx=e.clientX-sx, dy=e.clientY-sy;
+    if(Math.abs(dx)<6&&Math.abs(dy)<6) sendCmd("tap");
+    else if(Math.abs(dx)>Math.abs(dy)) sendCmd(dx>0?"swipe_right":"swipe_left");
+    else sendCmd(dy>0?"swipe_down":"swipe_up");
+    active=false;
+  });
+})();
+
+/* 初始化 */
+$("cfgBase").value=CFG.base; $("cfgToken").value=CFG.token||""; $("cfgRate").value=CFG.rate||"1500";
+logline("后端根地址："+CFG.base+"（健康检查 "+CFG.base+"/healthz，控制台 "+CFG.base+"/ui ）");
+checkHealth(true);
+})();
+</script>
+</body>
+</html>
