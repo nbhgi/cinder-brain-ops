@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>cinder-brain-ops 控制面板</title>
+<style>
+  :root{
+    --bg:#0f1216; --panel:#161b22; --panel2:#0d1117; --line:#262c36;
+    --txt:#e7ebf0; --mut:#8b949e; --dim:#6b7280; --blue:#58a6ff;
+    --green:#2ecc71; --amber:#f0a020; --red:#e74c3c; --purple:#a371f7;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    background:var(--bg); color:var(--txt); -webkit-tap-highlight-color:transparent;
+  }
+  header{
+    position:sticky;top:0;z-index:20;
+    display:flex;align-items:center;gap:9px;
+    padding:12px 14px;background:rgba(22,27,34,.92);
+    backdrop-filter:blur(8px);border-bottom:1px solid var(--line);
+  }
+  #dot{width:9px;height:9px;border-radius:50%;background:var(--amber);transition:.25s;flex:none}
+  #dot.on{background:var(--green);box-shadow:0 0 9px var(--green)}
+  #dot.off{background:var(--red);box-shadow:0 0 9px var(--red)}
+  h1{font-size:15px;margin:0;flex:1;font-weight:600;letter-spacing:.2px}
+  #st{font-size:11px}
+  nav{
+    display:flex;background:var(--panel);border-bottom:1px solid var(--line);
+    overflow-x:auto;scrollbar-width:none;position:sticky;top:45px;z-index:19;
+  }
+  nav::-webkit-scrollbar{display:none}
+  nav button{
+    background:none;border:0;color:var(--mut);padding:11px 15px;
+    font-size:13px;white-space:nowrap;cursor:pointer;transition:.15s;
+  }
+  nav button.act{color:var(--blue);border-bottom:2px solid var(--blue)}
+  main{padding:12px 14px 72px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:13px;margin-bottom:11px}
+  .card h3{margin:0 0 9px;font-size:12px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.5px}
+  .kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .kpi div{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px;text-align:center}
+  .kpi span{display:block;font-size:11px;color:var(--dim);margin-bottom:3px}
+  .kpi b{font-size:20px;font-weight:700;color:var(--blue);font-variant-numeric:tabular-nums}
+  label{display:block;font-size:11px;color:var(--mut);margin:9px 0 4px}
+  input,textarea,select{
+    width:100%;padding:9px 10px;border:1px solid #30363d;border-radius:7px;
+    background:var(--panel2);color:var(--txt);font:13px/1.4 inherit;outline:none;
+  }
+  input:focus,textarea:focus,select:focus{border-color:var(--blue)}
+  textarea{resize:vertical;min-height:64px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .btn{
+    width:100%;padding:10px;border:1px solid #2ea043;border-radius:7px;
+    background:#238636;color:#fff;font-size:13px;font-weight:600;cursor:pointer;margin-top:11px;
+  }
+  .btn:active{background:#1f7a33}
+  .btn.ghost{background:transparent;border-color:#30363d;color:var(--mut);margin-top:0}
+  .row2{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end}
+  .row{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:7px}
+  .row figure{margin:0;position:relative;border-radius:6px;overflow:hidden;background:#000;aspect-ratio:4/3}
+  .row figure img{width:100%;height:100%;object-fit:cover;display:block}
+  .row figure figcaption{
+    position:absolute;left:0;right:0;bottom:0;padding:2px 5px;
+    font-size:9px;color:#fff;background:rgba(0,0,0,.55);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  pre{white-space:pre-wrap;word-break:break-all;font-size:11px;max-height:320px;overflow:auto;margin:0;color:#7ee787;font-family:ui-monospace,Menlo,monospace}
+  .mut{color:var(--dim);font-size:12px}
+  .tag{display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;margin-left:5px;vertical-align:middle}
+  .tag.g{background:rgba(46,204,113,.15);color:var(--green)}
+  .tag.a{background:rgba(240,160,32,.15);color:var(--amber)}
+  .tag.b{background:rgba(88,166,255,.15);color:var(--blue)}
+  .tag.p{background:rgba(163,113,247,.15);color:var(--purple)}
+  .devitem{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px dashed #21262d;font-size:12px}
+  .devitem:last-child{border-bottom:0}
+  #toast{
+    position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(12px);
+    background:#21262d;border:1px solid #30363d;color:var(--txt);
+    padding:8px 15px;border-radius:20px;font-size:12px;opacity:0;pointer-events:none;transition:.25s;z-index:50;max-width:86vw;
+  }
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toolbar{display:flex;gap:7px;margin-top:8px}
+  .toolbar .btn.ghost{margin-top:0}
+  .empty{padding:14px 0;text-align:center;color:var(--dim);font-size:12px}
+</style>
+</head>
+<body>
+
+<header>
+  <span id="dot"></span>
+  <h1>cinder-brain-ops</h1>
+  <span class="mut" id="st">连接中…</span>
+</header>
+
+<nav>
+  <button class="act" data-p="dev">设备</button>
+  <button data-p="live">实时</button>
+  <button data-p="pic">相册</button>
+  <button data-p="cmd">指令</button>
+  <button data-p="log">日志</button>
+</nav>
+
+<main>
+  <!-- 设备 -->
+  <section id="dev">
+    <div class="card">
+      <div class="kpi">
+        <div><span>设备</span><b id="c_agent">0</b></div>
+        <div><span>帧</span><b id="c_frame">0</b></div>
+        <div><span>丢帧</span><b id="c_drop">0</b></div>
+      </div>
+      <div class="toolbar">
+        <button class="btn ghost" id="h_refresh">刷新</button>
+        <button class="btn ghost" id="h_export">导出日志</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>在线设备</h3>
+      <div id="devs"><div class="empty">暂无设备接入</div></div>
+    </div>
+  </section>
+
+  <!-- 实时 -->
+  <section id="live" hidden>
+    <div class="card">
+      <label>筛选设备（留空=全部）</label>
+      <input id="flt" placeholder="device_id" autocomplete="off">
+      <div style="margin-top:9px" class="mut">最近 <span id="live_n">0</span> 帧</div>
+      <div id="live_g" class="row" style="margin-top:8px"><div class="empty">等待帧…</div></div>
+    </div>
+  </section>
+
+  <!-- 相册 -->
+  <section id="pic" hidden>
+    <div class="card">
+      <h3>照片墙（本机最多留 120 张）</h3>
+      <div id="pic_g" class="row"><div class="empty">暂无照片</div></div>
+      <button class="btn ghost" id="pic_clear" style="margin-top:10px">清空</button>
+    </div>
+  </section>
+
+  <!-- 指令 -->
+  <section id="cmd" hidden>
+    <div class="card">
+      <h3>下发指令</h3>
+      <label>目标设备（留空=广播）</label>
+      <input id="t_dev" placeholder="device_id" autocomplete="off">
+      <label>JSON 载荷</label>
+      <textarea id="t_json" spellcheck="false">{"action":"ping"}</textarea>
+      <button class="btn" id="send">发送</button>
+      <div id="cmd_r" class="mut" style="margin-top:8px"></div>
+    </div>
+    <div class="card">
+      <h3>快捷指令</h3>
+      <div class="toolbar" style="grid-template-columns:1fr 1fr">
+        <button class="btn ghost" data-q='{"action":"ping"}'>Ping</button>
+        <button class="btn ghost" data-q='{"action":"frame","interval":2}'>推流 2s</button>
+        <button class="btn ghost" data-q='{"action":"photo"}'>拍照</button>
+        <button class="btn ghost" data-q='{"action":"locate"}'>定位</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 日志 -->
+  <section id="log" hidden>
+    <div class="card">
+      <h3>/healthz</h3>
+      <pre id="hz">—</pre>
+    </div>
+    <div class="card">
+      <h3>事件流水</h3>
+      <pre id="ev">—</pre>
+      <button class="btn ghost" id="ev_clear" style="margin-top:9px">清空</button>
+    </div>
+  </section>
+</main>
+
+<div id="toast"></div>
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var B = location.origin;
+  var S = (window.io) ? window.io(B, { transports: ['websocket', 'polling'], reconnection: true, reconnectionAttempts: Infinity, timeout: 4000 }) : null;
+
+  var DEV = new Map();   // device_id -> {id, t, n}
+  var LOG = [];          // 事件流水
+  var MAX_LIVE = 24, MAX_PIC = 120, MAX_LOG = 200;
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
+  function toast(m) { var t = $('toast'); t.textContent = m; t.className = 'show'; clearTimeout(t._h); t._h = setTimeout(function () { t.className = ''; }, 1800); }
+  function devid(d) { return (d && (d.id || d.device_id || d.sid || d.name)) || 'unknown'; }
+
+  // 图片字段兜底：裸 base64 自动补 data URI 头
+  function fix(u) {
+    if (!u) return '';
+    u = String(u);
+    if (u.indexOf('data:') === 0 || u.indexOf('http') === 0 || u.indexOf('blob:') === 0) return u;
+    return 'data:image/jpeg;base64,' + u.replace(/^base64,/, '');
+  }
+  function pickImg(d, keys) {
+    if (typeof d === 'string') return fix(d);
+    for (var i = 0; i < keys.length; i++) {
+      if (d[keys[i]]) return fix(d[keys[i]]);
+    }
+    return '';
+  }
+
+  // ---- Tab 切换 ----
+  var PAGES = ['dev', 'live', 'pic', 'cmd', 'log'];
+  document.querySelectorAll('nav button').forEach(function (b) {
+    b.onclick = function () {
+      document.querySelectorAll('nav button').forEach(function (x) { x.classList.remove('act'); });
+      b.classList.add('act');
+      PAGES.forEach(function (p) { $(p).hidden = (p !== b.dataset.p); });
+      if (b.dataset.p === 'dev') tick();
+    };
+  });
+
+  // ---- 状态灯 ----
+  function setDot(state, text) {
+    var d = $('dot');
+    d.className = (state === 'on') ? 'on' : (state === 'off' ? 'off' : '');
+    $('st').textContent = text;
+  }
+
+  // ---- 日志 ----
+  function lg(evt, extra) {
+    LOG.unshift(new Date().toLocaleTimeString() + '  ' + evt + (extra ? '  ' + JSON.stringify(extra).slice(0, 180) : ''));
+    if (LOG.length > MAX_LOG) LOG.length = MAX_LOG;
+    $('ev').textContent = LOG.slice(0, 60).join('\n');
+  }
+
+  // ---- 设备列表 ----
+  function rd() {
+    var arr = Array.from(DEV.values());
+    $('devs').innerHTML = arr.length
+      ? arr.map(function (x) {
+          return '<div class="devitem"><span>' + esc(x.id) + '<span class="tag g">在线</span></span>' +
+                 '<span class="mut">' + x.n + ' 帧 · ' + new Date(x.t).toLocaleTimeString() + '</span></div>';
+        }).join('')
+      : '<div class="empty">暂无设备接入</div>';
+    applyFilter();
+  }
+
+  // ---- 实时帧 ----
+  function addFrame(d) {
+    var id = devid(d);
+    if (DEV.has(id)) { var o = DEV.get(id); o.n++; o.t = Date.now(); }
+    var src = pickImg(d, ['frame', 'data', 'image', 'jpg', 'img', 'snapshot']);
+    if (!src) { rd(); return; }
+    var g = $('live_g');
+    if (g.querySelector('.empty')) g.innerHTML = '';
+    var w = document.createElement('figure');
+    w.dataset.d = id;
+    var im = new Image();
+    im.src = src;
+    im.alt = id;
+    w.appendChild(im);
+    var cap = document.createElement('figcaption');
+    cap.textContent = id;
+    w.appendChild(cap);
+    g.insertBefore(w, g.firstChild);
+    while (g.children.length > MAX_LIVE) g.removeChild(g.lastChild);
+    $('live_n').textContent = g.children.length;
+    rd();
+  }
+
+  // ---- 相册 ----
+  function addPic(d) {
+    var src = pickImg(d, ['data', 'photo', 'image', 'jpg', 'img', 'url']);
+    if (!src) return;
+    var g = $('pic_g');
+    if (g.querySelector('.empty')) g.innerHTML = '';
+    var w = document.createElement('figure');
+    var im = new Image();
+    im.src = src;
+    im.alt = devid(d);
+    w.appendChild(im);
+    var cap = document.createElement('figcaption');
+    cap.textContent = devid(d) + ' ' + new Date().toLocaleTimeString();
+    w.appendChild(cap);
+    g.insertBefore(w, g.firstChild);
+    while (g.children.length > MAX_PIC) g.removeChild(g.lastChild);
+  }
+
+  function applyFilter() {
+    var q = $('flt').value.trim();
+    Array.from($('live_g').children).forEach(function (c) {
+      c.style.display = (!q || c.dataset.d === q) ? '' : 'none';
+    });
+  }
+
+  // ---- 拉取健康状态 ----
+  function tick() {
+    fetch(B + '/healthz', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        $('c_agent').textContent = (j.agents != null) ? j.agents : DEV.size;
+        $('c_frame').textContent = j.frames != null ? j.frames : '-';
+        $('c_drop').textContent = j.drop != null ? j.drop : '-';
+        $('hz').textContent = JSON.stringify(j, null, 1);
+      })
+      .catch(function () { $('hz').textContent = '（/healthz 拉取失败，服务可能在休眠，稍等再试）'; });
+  }
+
+  // ---- SocketIO ----
+  if (S) {
+    setDot('', '连接中');
+    S.on('connect', function () { setDot('on', '已连 ' + B); lg('connect', { sid: S.id }); rd(); });
+    S.on('disconnect', function (r) { setDot('off', '断开，重连中'); lg('disconnect', { reason: r }); });
+    S.on('connect_error', function (e) { setDot('off', '连接失败'); lg('connect_error', { msg: String(e && e.message || e) }); });
+
+    S.on('agent_hello', function (d) {
+      var id = devid(d);
+      DEV.set(id, { id: id, t: Date.now(), n: (DEV.get(id) || {}).n || 0 });
+      lg('agent_hello', { id: id });
+      rd(); tick();
+    });
+    S.on('agent_bye', function (d) { var id = devid(d); DEV.delete(id); lg('agent_bye', { id: id }); rd(); tick(); });
+    S.on('frame', function (d) { lg('frame', { id: devid(d) }); addFrame(d); });
+    S.on('photo_data', function (d) { lg('photo_data', { id: devid(d) }); addPic(d); });
+    S.onAny(function (evt) {
+      if (['connect', 'disconnect', 'connect_error', 'agent_hello', 'agent_bye', 'frame', 'photo_data'].indexOf(evt) < 0) {
+        lg('evt:' + evt, Array.isArray(arguments) ? {} : {});
+      }
+    });
+  } else {
+    setDot('off', 'socket.io 未加载');
+    lg('fatal', { msg: 'window.io 不存在，CDN 可能被拦截' });
+  }
+
+  // ---- 交互 ----
+  $('flt').oninput = applyFilter;
+  $('h_refresh').onclick = function () { tick(); rd(); toast('已刷新'); };
+  $('h_export').onclick = function () {
+    var blob = new Blob([LOG.join('\n')], { type: 'text/plain;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'cinder-ops-log.txt';
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1500);
+  };
+  $('pic_clear').onclick = function () { $('pic_g').innerHTML = '<div class="empty">暂无照片</div>'; toast('相册已清空'); };
+  $('ev_clear').onclick = function () { LOG = []; $('ev').textContent = '—'; };
+
+  function sendCmd(payload) {
+    var p;
+    try { p = (typeof payload === 'string') ? JSON.parse(payload) : payload; }
+    catch (e) { $('cmd_r').textContent = 'JSON 解析失败：' + e.message; toast('JSON 不对'); return; }
+    var body = { payload: p };
+    var t = $('t_dev').value.trim();
+    if (t) body.device_id = t;
+    fetch(B + '/api/cmd', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    })
+      .then(function (r) { return r.text(); })
+      .then(function (x) { $('cmd_r').textContent = '已发送：' + x.slice(0, 200); lg('cmd', body); toast('指令已发'); })
+      .catch(function (e) { $('cmd_r').textContent = '发送失败：' + e.message; toast('发送失败'); });
+  }
+  $('send').onclick = function () { sendCmd($('t_json').value); };
+  document.querySelectorAll('[data-q]').forEach(function (b) {
+    b.onclick = function () { $('t_json').value = b.dataset.q; sendCmd(b.dataset.q); };
+  });
+
+  // 启动
+  tick();
+  rd();
+  setInterval(tick, 4000);
+})();
+</script>
+</body>
+</html>
