@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cinder // 远程控制台</title>
+<style>
+:root{--bg:#07090d;--card:#0d1017;--line:#1d2230;--txt:#e8ebf2;--dim:#79839a;--acc:#7b6bff;--acc2:#25d0a8;--red:#ff4d6a;--grn:#2ec97a}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;padding:14px 14px 26px;max-width:520px;margin:0 auto}
+header{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+header h1{flex:1;font-size:19px;font-weight:700;letter-spacing:.3px}
+header h1 b{color:var(--acc);font-weight:700}
+header h1 i{color:var(--acc2);font-style:normal}
+.iconbtn{width:38px;height:38px;border-radius:11px;border:1px solid var(--line);background:var(--card);color:var(--txt);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.iconbtn:active{transform:scale(.94)}
+#lamp{display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:20px;border:1px solid var(--line);background:var(--card);font-size:12px;white-space:nowrap}
+#dot{width:8px;height:8px;border-radius:50%;background:var(--red);box-shadow:0 0 8px var(--red)}
+#lamp.on #dot{background:var(--grn);box-shadow:0 0 8px var(--grn)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:13px;margin-bottom:12px}
+.card h3{font-size:13px;color:var(--dim);font-weight:600;margin-bottom:9px;display:flex;align-items:center;gap:6px}
+.card h3 .tag{font-size:10px;padding:2px 7px;border-radius:9px;background:rgba(255,77,109,.15);color:var(--red)}
+.card h3 .tag.ok{background:rgba(46,201,122,.15);color:var(--grn)}
+#screen{position:relative;width:100%;aspect-ratio:9/16;max-height:52vh;background:#000;border-radius:11px;overflow:hidden;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:var(--dim);font-size:12px}
+#screen img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none}
+#screen.bad img{display:none}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.key{height:46px;border-radius:11px;border:1px solid var(--line);background:#11141c;color:var(--txt);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.key:active{background:var(--acc);transform:scale(.95)}
+.key.sm{height:38px;font-size:12px;display:flex;align-items:center;gap:4px}
+#bright{width:100%;margin-top:9px;accent-color:var(--acc)}
+#bval{text-align:center;font-size:11px;color:var(--dim);margin-top:4px}
+#term{height:150px;overflow-y:auto;background:#05070c;border-radius:9px;padding:9px;font-family:monospace;font-size:11px;line-height:1.6;color:var(--dim);white-space:pre-wrap}
+#terr{display:flex;gap:7px;margin-top:8px}
+#tcmd{flex:1;background:#05070c;border:1px solid var(--line);border-radius:9px;padding:9px;color:var(--txt);font-size:12px;outline:none}
+#tgo{background:var(--acc);border:0;color:#fff;padding:9px 15px;border-radius:9px;font-size:12px;cursor:pointer}
+#cv{width:100%;height:110px;background:#000;border-radius:9px;touch-action:none;cursor:crosshair;display:block}
+#cvbar{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+#cvbar button{flex:1;min-width:60px;padding:7px;border-radius:8px;border:1px solid var(--line);background:#11141c;color:var(--txt);font-size:11px;cursor:pointer}
+#gal{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+#gal figure{position:relative;margin:0}
+#gal img{width:100%;height:88px;object-fit:cover;border-radius:7px;background:#000;display:block}
+#gal button{position:absolute;top:3px;right:3px;width:17px;height:17px;border-radius:50%;border:0;background:rgba(0,0,0,.75);color:#fff;font-size:11px;line-height:1;cursor:pointer}
+#clips{display:flex;flex-direction:column;gap:8px}
+#clips video{width:100%;border-radius:9px;background:#000;display:block}
+#clips .row{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--dim)}
+#clips .row a{color:var(--acc2);margin-left:auto;text-decoration:none}
+#files{font-family:monospace;font-size:11px;line-height:1.8;color:var(--dim);max-height:170px;overflow-y:auto;background:#05070c;border-radius:9px;padding:8px;margin-top:9px}
+#files div:active{color:var(--acc2)}
+#log{display:none;background:#05070c;border:1px solid var(--line);border-radius:9px;padding:8px;font-family:monospace;font-size:10px;line-height:1.6;color:var(--dim);height:120px;overflow-y:auto;margin-top:10px;white-space:pre-wrap}
+#menu{position:absolute;top:60px;right:14px;z-index:99;width:158px;background:#12151f;border:1px solid #2b3145;border-radius:13px;padding:6px;display:none;box-shadow:0 14px 40px rgba(0,0,0,.6)}
+#menu button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:transparent;border:0;color:var(--txt);padding:10px 9px;border-radius:9px;font-size:12px;cursor:pointer}
+#menu button:active{background:var(--acc)}
+#menu button small{margin-left:auto;color:var(--dim);font-size:10px}
+#menu hr{border:0;border-top:1px solid var(--line);margin:5px 8px}
+#mask{position:fixed;inset:0;z-index:120;background:rgba(0,0,0,.94);display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px}
+#mask img{max-width:94vw;max-height:80vh;border-radius:12px}
+#mask button{background:var(--acc);border:0;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px}
+footer{text-align:center;color:#3d4354;font-size:10px;margin-top:16px;line-height:1.8}
+</style>
+</head>
+<body>
+
+<header>
+  <h1><b>Cinder</b> <i>//</i> 远程控制台</h1>
+  <div id="lamp"><span id="dot"></span><span id="ltxt">离线</span></div>
+  <button class="iconbtn" id="burger" aria-label="菜单">&#9776;</button>
+</header>
+
+<div class="card">
+  <h3>实时画面 <span class="tag" id="st">未连接</span></h3>
+  <div id="screen" class="bad">
+    <img id="simg" alt="">
+    <span id="smsg">等待 Agent 接管<br>手机 Agent 上线后此处显示真实画面</span>
+  </div>
+</div>
+
+<div class="card">
+  <div class="grid">
+    <button class="key" data-k="up">&#9650;</button>
+    <button class="key" data-k="home">&#8962;</button>
+    <button class="key" data-k="back">&#8630;</button>
+    <button class="key" data-k="menu">&#9776;</button>
+    <button class="key" data-k="left">&#9664;</button>
+    <button class="key" data-k="power">&#9679;</button>
+    <button class="key" data-k="right">&#9654;</button>
+    <button class="key" data-k="recent">&#9633;</button>
+    <button class="key" data-k="voldn">&#128266;</button>
+    <button class="key" data-k="down">&#9660;</button>
+    <button class="key" data-k="volup">&#128266;</button>
+    <button class="key" data-k="wake">&#128246;</button>
+  </div>
+  <div id="bval">亮度 80%</div>
+  <input type="range" id="bright" min="1" max="100" value="80">
+</div>
+
+<div class="card">
+  <div class="grid">
+    <button class="key sm" data-x="shot">&#128247; 截图</button>
+    <button class="key sm" data-x="rec">&#128308; 录制</button>
+    <button class="key sm" data-x="clip">&#128203; 剪贴板</button>
+    <button class="key sm" data-x="open">&#128640; 打开</button>
+    <button class="key sm" data-x="toast">&#128172; 弹窗</button>
+    <button class="key sm" data-x="vibrate">&#128243; 震动</button>
+    <button class="key sm" data-x="tts">&#128279; 朗读</button>
+    <button class="key sm" data-x="flash">&#128161; 闪光灯</button>
+  </div>
+</div>
+
+<div class="card">
+  <h3>远程终端 <span class="tag">adb / shell</span></h3>
+  <div id="term">Cinder shell v1.3.1 - 连接 Agent 后指令下发到手机执行
+输入 help 查看可用命令
+</div>
+  <div id="terr">
+    <input id="tcmd" placeholder="输入命令，回车执行" autocomplete="off">
+    <button id="tgo">执行</button>
+  </div>
+</div>
+
+<div class="card">
+  <h3>画布投放 <span class="tag">Agent 屏幕涂鸦</span></h3>
+  <canvas id="cv" width="440" height="110"></canvas>
+  <div id="cvbar">
+    <button data-cv="pen">&#9998; 画笔</button>
+    <button data-cv="line">/ 直线</button>
+    <button data-cv="rect">&#9634; 矩形</button>
+    <button data-cv="clear">&#128465; 清空</button>
+  </div>
+</div>
+
+<div class="card">
+  <h3>截图画廊 <span class="tag" id="gcnt">0 张</span></h3>
+  <div id="gal"></div>
+</div>
+
+<div class="card">
+  <h3>录像回放 <span class="tag" id="rcnt">0 段</span></h3>
+  <div id="clips"><div style="font-size:11px;color:#3d4354">暂无录像，点上方「录制」开始</div></div>
+</div>
+
+<div class="card">
+  <h3>文件浏览 <span class="tag ok" id="fpath">/sdcard</span></h3>
+  <div class="grid">
+    <button class="key sm" data-f="/">/</button>
+    <button class="key sm" data-f="/sdcard">/sdcard</button>
+    <button class="key sm" data-f="Download">Download</button>
+    <button class="key sm" data-f="DCIM">DCIM</button>
+  </div>
+  <div id="files">点击上方路径加载...</div>
+</div>
+
+<div id="log"></div>
+
+<footer>
+  Cinder // 远程控制台&nbsp;&nbsp;<b>v1.3.1-clip</b><br>
+  前端已就绪，真实控制需手机 Agent 上线
+</footer>
+
+<div id="menu"></div>
+<div id="mask"><img id="maskimg" alt=""><button id="maskx">关闭</button></div>
+
+<script>
+'use strict';
+var DEMO = false;
+var API = location.origin;
+var PATHS = ['/api/health','/api/healthz','/api/status','/healthz'];
+var online = false, agent = false, hpath = '', recording = false, tool = 'pen';
+var clips = [], shots = [];
+
+function log(s){
+  var e = document.getElementById('log');
+  e.style.display = 'block';
+  var d = new Date(), p = function(n){ return n < 10 ? '0'+n : ''+n; };
+  e.textContent += p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds())+'  '+s+'\n';
+  e.scrollTop = e.scrollHeight;
+}
+function toast(s){
+  var t = document.createElement('div');
+  t.textContent = s;
+  t.style.cssText = 'position:fixed;left:50%;top:22%;transform:translateX(-50%);z-index:200;background:rgba(20,24,34,.96);border:1px solid #2b3145;color:#e8ebf2;padding:10px 18px;border-radius:11px;font-size:12px;max-width:80vw;text-align:center';
+  document.body.appendChild(t);
+  setTimeout(function(){ t.remove(); }, 1900);
+}
+function setLamp(ok){
+  online = !!ok;
+  document.getElementById('lamp').className = ok ? 'on' : '';
+  document.getElementById('ltxt').textContent = ok ? '在线' : '离线';
+}
+function needAgent(what){
+  if (!agent){ toast('没有设备在线，' + what + '无效'); log('! ' + what + ' 被拒：无 Agent'); return false; }
+  return true;
+}
+
+function detect(){
+  var i = 0;
+  (function next(){
+    if (i >= PATHS.length){ setLamp(false); log('健康检查全部失败'); return; }
+    fetch(API + PATHS[i], { method: 'GET', cache: 'no-store' })
+      .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function(d){
+        hpath = PATHS[i]; setLamp(true);
+        agent = (d.agents || 0) > 0 || (d.devices || 0) > 0;
+        document.getElementById('st').textContent = agent ? '实时' : '未连接';
+        document.getElementById('st').className = agent ? 'tag ok' : 'tag';
+        log('health ok via ' + PATHS[i] + ' agents=' + (d.agents || 0));
+      })
+      .catch(function(){ i++; next(); });
+  })();
+}
+
+function pull(){
+  var u = API + '/api/screenshot?t=' + Date.now();
+  fetch(u, { cache: 'no-store' })
+    .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+    .then(function(b){
+      if (b.size < 500) throw new Error('empty');
+      var fr = new FileReader();
+      fr.onload = function(){
+        var img = document.getElementById('simg');
+        img.src = fr.result;
+        img.onload = function(){
+          if (img.naturalWidth < 50){ document.getElementById('screen').className = 'bad'; agent = false; }
+          else { document.getElementById('screen').className = ''; agent = true; }
+        };
+      };
+      fr.readAsDataURL(b);
+    })
+    .catch(function(){ /* 静默，不弹红框 */ });
+}
+
+function sendCmd(cmd, param){
+  var p = new URLSearchParams(); p.set('command', cmd);
+  if (param !== undefined && param !== '') p.set('param', param);
+  return fetch(API + '/api/control?' + p.toString(), { method: 'POST' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      log('cmd ' + cmd + ' -> ' + JSON.stringify(d));
+      if (!d.executed) toast('指令已下发，等待 Agent 接管');
+      return d;
+    })
+    .catch(function(e){ log('cmd ' + cmd + ' 失败：' + e.message); toast('指令发送失败'); });
+}
+
+function termPrint(s, cls){
+  var t = document.getElementById('term');
+  var d = document.createElement('div');
+  d.textContent = s;
+  if (cls === 'err') d.style.color = '#ff6b81';
+  else if (cls === 'ok') d.style.color = '#2ec97a';
+  else if (cls === 'dim') d.style.color = '#79839a';
+  t.appendChild(d); t.scrollTop = t.scrollHeight;
+}
+function runCmd(raw){
+  var s = (raw || '').trim();
+  if (!s) return;
+  termPrint('$ ' + s, 'dim');
+  if (s === 'clear'){ document.getElementById('term').textContent = ''; return; }
+  if (s === 'help'){ termPrint('ls [路径] | cd <路径> | cat <文件> | screencap | input keyevent <键> | w | reboot | clear', 'dim'); return; }
+  fetch(API + '/api/shell?cmd=' + encodeURIComponent(s), { method: 'POST' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.stub) termPrint('→ [演示] 本地模拟执行：' + s, 'dim');
+      else if (d.ok === false) termPrint(d.error || '执行失败', 'err');
+      else termPrint(d.out || '(无输出)', d.rc === 0 || d.rc === undefined ? 'ok' : 'err');
+    })
+    .catch(function(e){ termPrint('网络错误：' + e.message, 'err'); });
+}
+
+function addShot(src, label){
+  if (!src) return;
+  if (shots.length >= 12) shots.shift();
+  shots.push({ src: src, label: label || '' });
+  renderShots();
+}
+function renderShots(){
+  var g = document.getElementById('gal');
+  g.textContent = '';
+  shots.forEach(function(s, i){
+    var f = document.createElement('figure');
+    var im = document.createElement('img');
+    im.src = s.src; im.alt = '';
+    im.onclick = function(){
+      document.getElementById('maskimg').src = s.src;
+      document.getElementById('mask').style.display = 'flex';
+    };
+    var b = document.createElement('button');
+    b.textContent = '×';
+    b.onclick = function(e){ e.stopPropagation(); shots.splice(i, 1); renderShots(); };
+    f.appendChild(im); f.appendChild(b); g.appendChild(f);
+  });
+  document.getElementById('gcnt').textContent = shots.length + ' 张';
+}
+function doShot(){
+  if (!needAgent('抓拍')) return;
+  var img = document.getElementById('simg');
+  if (!img.src || document.getElementById('screen').className === 'bad'){ toast('当前无真实画面可抓'); return; }
+  addShot(img.src, 'manual');
+  toast('已抓拍');
+}
+
+var recTimer = null, recN = 0;
+function toggleRec(){
+  if (!recording){
+    if (!needAgent('录制')) return;
+    recording = true; recN = 0;
+    fetch(API + '/api/record?action=start', { method: 'POST' }).then(function(r){ return r.json(); }).then(function(d){
+      log('录制开始 id=' + d.id);
+      toast('录制中…再按停止');
+      recTimer = setInterval(function(){
+        var img = document.getElementById('simg');
+        if (!img.src) return;
+        fetch(API + '/api/frame', { method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: (window.__rid || ''), data: img.src.split(',')[1] || '' }) }).catch(function(){});
+        recN++;
+      }, 1200);
+    }).catch(function(e){ recording = false; toast('录制启动失败'); log('录制失败 ' + e.message); });
+  } else {
+    recording = false;
+    if (recTimer) clearInterval(recTimer);
+    fetch(API + '/api/record?action=stop', { method: 'POST' }).then(function(r){ return r.json(); }).then(function(d){
+      log('录制停止 frames=' + (d.frames || 0));
+      toast('录制结束，共 ' + (d.frames || 0) + ' 帧');
+      if (d.url) loadClips();
+    }).catch(function(e){ toast('停止录制失败'); });
+  }
+}
+
+function loadClips(){
+  fetch(API + '/api/clips', { cache: 'no-store' }).then(function(r){ return r.json(); }).then(function(list){
+    clips = list || [];
+    var box = document.getElementById('clips');
+    box.textContent = '';
+    if (!clips.length){
+      box.innerHTML = '<div style="font-size:11px;color:#3d4354">暂无录像，点上方「录制」开始</div>';
+    } else {
+      clips.forEach(function(c){
+        var row = document.createElement('div');
+        row.className = 'row';
+        row.textContent = (c.name || 'clip') + '  ' + (c.frames || 0) + ' 帧';
+        var a = document.createElement('a');
+        a.textContent = '⬇ 下载'; a.href = c.url || ('/static/clips/' + c.name);
+        row.appendChild(a); box.appendChild(row);
+        if (c.url){
+          var v = document.createElement('video');
+          v.src = c.url; v.controls = true; v.preload = 'metadata';
+          box.appendChild(v);
+        }
+      });
+    }
+    document.getElementById('rcnt').textContent = clips.length + ' 段';
+  }).catch(function(){});
+}
+
+function loadFiles(p){
+  document.getElementById('fpath').textContent = p;
+  fetch(API + '/api/files?path=' + encodeURIComponent(p))
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var b = document.getElementById('files'); b.textContent = '';
+      (d.items || []).forEach(function(it){
+        var r = document.createElement('div');
+        r.textContent = (it.type === 'dir' ? '📁 ' : '📄 ') + it.name;
+        if (it.type === 'dir'){
+          r.style.cursor = 'pointer';
+          r.onclick = function(){ loadFiles((d.path === '/' ? '' : d.path) + '/' + it.name); };
+        }
+        b.appendChild(r);
+      });
+      if (!(d.items || []).length) b.textContent = '（空目录）';
+      log('files ' + p + ' -> ' + (d.items || []).length);
+    })
+    .catch(function(){ document.getElementById('files').textContent = '加载失败'; });
+}
+
+var cv = document.getElementById('cv');
+var ctx = cv.getContext('2d');
+var drawing = false, sx = 0, sy = 0;
+ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cv.width, cv.height);
+function cvPos(e){
+  var r = cv.getBoundingClientRect();
+  var t = e.touches ? e.touches[0] : e;
+  return { x: Math.round((t.clientX - r.left) / r.width * cv.width),
+           y: Math.round((t.clientY - r.top) / r.height * cv.height) };
+}
+function cvStart(e){
+  e.preventDefault();
+  var p = cvPos(e); drawing = true; sx = p.x; sy = p.y;
+  ctx.strokeStyle = '#25d0a8'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(p.x, p.y);
+  if (tool !== 'clear') sendCmd('draw', tool + ' ' + p.x + ' ' + p.y + ' down');
+}
+function cvMove(e){
+  if (!drawing) return;
+  e.preventDefault();
+  var p = cvPos(e);
+  if (tool === 'pen' || tool === 'clear'){ ctx.lineTo(p.x, p.y); ctx.stroke(); }
+  if (tool !== 'clear') sendCmd('draw', tool + ' ' + p.x + ' ' + p.y + ' move');
+}
+function cvEnd(e){
+  if (!drawing) return;
+  drawing = false;
+  var p = e.changedTouches ? { x: sx, y: sy } : cvPos(e);
+  if (tool === 'line'){ ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(p.x, p.y); ctx.stroke(); }
+  if (tool === 'rect'){ ctx.strokeRect(sx, sy, p.x - sx, p.y - sy); }
+  if (tool !== 'clear') sendCmd('draw', tool + ' ' + p.x + ' ' + p.y + ' up');
+}
+cv.addEventListener('mousedown', cvStart);
+cv.addEventListener('mousemove', cvMove);
+window.addEventListener('mouseup', cvEnd);
+cv.addEventListener('touchstart', cvStart, { passive: false });
+cv.addEventListener('touchmove', cvMove, { passive: false });
+cv.addEventListener('touchend', cvEnd);
+
+document.getElementById('burger').onclick = function(e){
+  e.stopPropagation();
+  var m = document.getElementById('menu');
+  var acts = [
+    ['日志', 'log'], ['重新检测', 'recheck'], ['文件浏览', 'files'],
+    ['健康检查', 'health'], ['设备列表', 'devs'], ['刷新录像', 'clips'],
+    ['清空画布', 'clear'], ['关于', 'about']
+  ];
+  m.textContent = '';
+  acts.forEach(function(a){
+    var b = document.createElement('button');
+    b.textContent = a[0]; b.setAttribute('data-act', a[1]);
+    if (a[1] === 'log'){ var s = document.createElement('small'); s.textContent = '▾'; b.appendChild(s); }
+    m.appendChild(b);
+  });
+  m.style.display = m.style.display === 'block' ? 'none' : 'block';
+};
+document.addEventListener('click', function(e){
+  var m = document.getElementById('menu');
+  var btn = e.target.closest ? e.target.closest('#menu button') : null;
+  if (btn){
+    var a = btn.getAttribute('data-act');
+    if (a === 'log'){ var l = document.getElementById('log'); l.style.display = l.style.display === 'block' ? 'none' : 'block'; }
+    if (a === 'recheck') detect();
+    if (a === 'files') loadFiles('/sdcard');
+    if (a === 'health') fetch(API + hpath).then(function(r){ return r.json(); }).then(function(d){ toast('ok=' + d.ok + ' agents=' + (d.agents || 0)); });
+    if (a === 'devs'){
+      fetch(API + '/api/devices').then(function(r){ return r.json(); }).then(function(d){
+        log('devices: ' + (d.length ? d.map(function(x){ return x.id; }).join(', ') : '无'));
+        toast(d.length ? d.map(function(x){ return x.id; }).join(', ') : '无设备在线');
+      });
+    }
+    if (a === 'clips') loadClips();
+    if (a === 'clear'){ ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cv.width, cv.height); }
+    if (a === 'about') toast('Cinder v1.3.1-clip · ' + API);
+    m.style.display = 'none';
+    return;
+  }
+  if (!e.target.closest || !e.target.closest('#menu')) m.style.display = 'none';
+});
+document.getElementById('maskx').onclick = function(){ document.getElementById('mask').style.display = 'none'; };
+document.getElementById('bright').oninput = function(){
+  document.getElementById('bval').textContent = '亮度 ' + this.value + '%';
+  sendCmd('brightness', this.value);
+};
+document.querySelectorAll('.key[data-k]').forEach(function(b){
+  b.onclick = function(){ sendCmd(b.getAttribute('data-k')); };
+});
+document.querySelectorAll('.key[data-x]').forEach(function(b){
+  b.onclick = function(){
+    var x = b.getAttribute('data-x');
+    if (x === 'shot'){ doShot(); return; }
+    if (x === 'rec'){ toggleRec(); return; }
+    if (!needAgent(b.textContent.trim())) return;
+    if (x === 'clip' || x === 'open'){
+      var v = prompt(x === 'clip' ? '推送到手机剪贴板的文字' : '让手机打开的链接');
+      if (v) sendCmd(x, v);
+      return;
+    }
+    if (x === 'toast'){ var t2 = prompt('弹窗内容'); if (t2){ toast(t2); sendCmd('toast', t2); } return; }
+    if (x === 'tts'){ var t3 = prompt('朗读内容'); if (t3) sendCmd('tts', t3); return; }
+    sendCmd(x);
+  };
+});
+document.querySelectorAll('#cvbar button').forEach(function(b){
+  b.onclick = function(){
+    var c = b.getAttribute('data-cv');
+    if (c === 'clear'){ ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cv.width, cv.height); sendCmd('draw', 'clear'); return; }
+    tool = c;
+    if (!agent) toast('画布已就绪，落笔指令需 Agent 在线才生效');
+  };
+});
+document.querySelectorAll('#files ~ .grid .key[data-f]').forEach(function(b){
+  b.onclick = function(){ loadFiles(b.getAttribute('data-f')); };
+});
+document.getElementById('tgo').onclick = function(){ runCmd(document.getElementById('tcmd').value); };
+document.getElementById('tcmd').onkeydown = function(e){ if (e.key === 'Enter') runCmd(this.value); };
+
+detect();
+pull();
+loadClips();
+setInterval(detect, 4000);
+setInterval(pull, 4000);
+setInterval(loadClips, 15000);
+</script>
+</body>
+</html>
