@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: cinder-brain-ops
+    env: python
+    region: singapore
+    plan: free
+    runtimeVersion: python-3.11.9
+    rootDir: .
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: WEB_CONCURRENCY
+        value: "1"
+      - key: AGENT_TOKEN
+        value: cinder-dev-token
