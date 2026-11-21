@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<!-- Cinder 控制台前端：单文件可直接双击打开，也可由 /panel/ 提供 -->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Cinder // 远程控制台</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0c12; --card:#12151f; --card2:#171b27; --line:#242938;
+  --txt:#e6e9f0; --dim:#7d8598; --acc:#7c5cff; --acc2:#00e0c6;
+  --red:#ff4d6d; --grn:#2ec77a; --yel:#ffb020;
+}
+html,body{background:var(--bg);color:var(--txt);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  -webkit-tap-highlight-color:transparent}
+body{padding:14px 14px 90px}
+header{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.brand{font-size:21px;font-weight:800;letter-spacing:.5px;flex:1}
+.brand b{color:var(--acc)}
+.brand i{color:var(--acc2);font-style:normal;margin:0 4px}
+.iconbtn{width:38px;height:38px;border-radius:11px;border:1px solid var(--line);
+  background:var(--card);color:var(--txt);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.iconbtn:active{transform:scale(.94)}
+#lamp{display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:20px;
+  border:1px solid var(--line);background:var(--card);font-size:12px;white-space:nowrap}
+#dot{width:8px;height:8px;border-radius:50%;background:var(--red);box-shadow:0 0 8px var(--red)}
+#lamp.on #dot{background:var(--grn);box-shadow:0 0 8px var(--grn)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:13px;margin-bottom:12px}
+.card h3{font-size:13px;color:var(--dim);font-weight:600;margin-bottom:9px;display:flex;align-items:center;gap:6px}
+.card h3 .tag{font-size:10px;padding:2px 7px;border-radius:9px;background:rgba(255,77,109,.15);color:var(--red)}
+.card h3 .tag.ok{background:rgba(46,199,122,.15);color:var(--grn)}
+/* 实时画面 */
+#screen{position:relative;width:100%;aspect-ratio:9/16;max-height:52vh;background:#000;
+  border-radius:12px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+#screen img{width:100%;height:100%;object-fit:cover;display:block}
+#ph{position:absolute;text-align:center;color:var(--dim);font-size:13px;line-height:1.9;padding:20px}
+#ph div:first-child{font-size:30px;margin-bottom:8px;opacity:.5}
+#cross{position:absolute;inset:0;pointer-events:none;display:none}
+#cross::before,#cross::after{content:"";position:absolute;background:rgba(124,92,255,.35)}
+#cross::before{left:50%;top:0;width:1px;height:100%}
+#cross::after{top:50%;left:0;height:1px;width:100%}
+/* 控制键 */
+.pad{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.pad button,.acts button{background:var(--card2);border:1px solid var(--line);color:var(--txt);
+  border-radius:11px;padding:12px 4px;font-size:12px;cursor:pointer;transition:.12s}
+.pad button:active,.acts button:active{background:var(--acc);border-color:var(--acc);transform:scale(.95)}
+.acts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}
+.acts button.danger:active{background:var(--red);border-color:var(--red)}
+/* 滑杆 */
+.slider{margin-top:10px}
+.slider label{font-size:11px;color:var(--dim);display:flex;justify-content:center;gap:8px;margin-bottom:5px}
+input[type=range]{width:100%;-webkit-appearance:none;height:4px;border-radius:2px;background:var(--line);outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;
+  background:var(--acc);border:2px solid #fff;box-shadow:0 0 8px rgba(124,92,255,.6)}
+/* 终端 */
+#term{background:#05070c;border:1px solid var(--line);border-radius:10px;padding:9px;
+  height:160px;overflow-y:auto;font-family:ui-monospace,Menlo,Consolas,monospace;
+  font-size:11px;line-height:1.55;color:#9dffcf;white-space:pre-wrap;word-break:break-all}
+#term .e{color:var(--red)} #term .s{color:var(--acc2)} #term .d{color:var(--dim)}
+.termrow{display:flex;gap:7px;margin-top:8px}
+.termrow input{flex:1;background:#05070c;border:1px solid var(--line);border-radius:9px;
+  padding:9px 10px;color:var(--txt);font-size:12px;font-family:monospace;outline:none}
+.termrow button{background:var(--acc);border:0;border-radius:9px;padding:9px 14px;color:#fff;font-size:12px;cursor:pointer}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.chips span{font-size:10px;padding:4px 9px;border-radius:8px;background:var(--card2);
+  border:1px solid var(--line);color:var(--dim);cursor:pointer}
+.chips span:active{background:var(--acc);color:#fff}
+/* 画笔 */
+#mtx{width:100%;aspect-ratio:16/9;background:#05070c;border:1px solid var(--line);
+  border-radius:10px;touch-action:none;display:block}
+/* 画廊 */
+.gal{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:9px}
+.gal img{width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:7px;background:#000;cursor:pointer}
+/* 文件 */
+#files{font-family:monospace;font-size:11px;line-height:1.8;color:var(--dim);
+  max-height:170px;overflow-y:auto;background:#05070c;border-radius:9px;padding:8px;margin-top:9px}
+#files div:active{color:var(--acc2)}
+/* 日志 */
+#log{display:none;background:#05070c;border:1px solid var(--line);border-radius:9px;
+  padding:8px;font-family:monospace;font-size:10px;line-height:1.6;color:var(--dim);
+  height:120px;overflow-y:auto;margin-top:10px;white-space:pre-wrap}
+/* 下拉菜单 */
+#menu{position:absolute;top:60px;right:14px;width:186px;z-index:99;
+  background:#12151f;border:1px solid #2b3145;border-radius:13px;padding:6px;display:none;
+  box-shadow:0 14px 40px rgba(0,0,0,.6)}
+#menu button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;
+  background:transparent;border:0;color:var(--txt);padding:10px 9px;border-radius:9px;font-size:12px;cursor:pointer}
+#menu button:active{background:var(--acc)}
+#menu button small{margin-left:auto;color:var(--dim);font-size:10px}
+#menu hr{border:0;border-top:1px solid var(--line);margin:5px 8px}
+#veil{position:fixed;inset:0;z-index:98;display:none}
+/* 弹幕 */
+#danmu{position:fixed;left:0;right:0;top:22%;z-index:120;pointer-events:none}
+.dm{position:absolute;right:-40vw;white-space:nowrap;font-size:19px;font-weight:800;
+  color:#fff;text-shadow:0 0 12px var(--acc),0 0 3px #000;animation:fly 5.5s linear forwards}
+@keyframes fly{to{right:105vw}}
+/* 灯效 */
+#flash{position:fixed;inset:0;z-index:130;pointer-events:none;opacity:0;
+  background:radial-gradient(circle,rgba(124,92,255,.35),transparent 65%);transition:opacity .18s}
+#flash.go{opacity:1}
+#mask{position:fixed;inset:0;z-index:140;background:#000;opacity:0;
+  pointer-events:none;transition:opacity .45s}
+#mask.on{opacity:1}
+/* 预览 */
+#prev{position:fixed;inset:0;z-index:150;background:rgba(0,0,0,.94);display:none;
+  align-items:center;justify-content:center;flex-direction:column;gap:12px}
+#prev img{max-width:94vw;max-height:80vh;border-radius:12px}
+#prev button{background:var(--acc);border:0;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px}
+footer{text-align:center;color:#3d4354;font-size:10px;margin-top:16px;line-height:1.8}
+
+.gi{position:relative}
+.gi .del{position:absolute;top:4px;right:4px;width:20px;height:20px;line-height:16px;
+  padding:0;border-radius:50%;background:rgba(0,0,0,.65);color:#ff5c72;border:1px solid #333}
+.gi video{width:100%;height:120px;object-fit:cover;border-radius:8px;background:#05070c;display:block}
+.gi .cap{font-size:11px;color:#7a8397;margin-top:4px;text-align:center}
+.gi .dl{position:absolute;top:4px;left:4px;font-size:12px;color:#00e5c7;
+  background:rgba(0,0,0,.65);border:1px solid #333;border-radius:6px;padding:1px 5px;text-decoration:none}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand"><b>Cinder</b><i>//</i>远程控制台</div>
+  <div id="lamp"><span id="dot"></span><span id="lampTxt">离线</span></div>
+  <button class="iconbtn" id="btnMenu" data-act="menu">&#9776;</button>
+</header>
+
+<div class="card">
+  <h3>实时画面 <span class="tag" id="srcTag">未连接</span></h3>
+  <div id="screen">
+    <div id="ph"><div>&#128225;</div><div>等待 Agent 接管</div><div style="font-size:11px;opacity:.7">手机 Agent 上线后此处显示真实画面</div></div>
+    <img id="frame" alt="" style="display:none">
+    <div id="cross"></div>
+  </div>
+  <div class="pad">
+    <button data-key="UP">▲</button>
+    <button data-key="HOME">&#8962;</button>
+    <button data-key="BACK">&#8630;</button>
+    <button data-key="MENU">&#9776;</button>
+    <button data-key="LEFT">◀</button>
+    <button data-key="OK">●</button>
+    <button data-key="RIGHT">▶</button>
+    <button data-key="RECENT">&#9633;</button>
+    <button data-key="VOL-">🔉</button>
+    <button data-key="DOWN">▼</button>
+    <button data-key="VOL+">🔊</button>
+    <button data-key="POWER" class="danger">&#9211;</button>
+  </div>
+  <div class="slider">
+    <label><span>亮度</span><span id="briVal">80%</span></label>
+    <input type="range" id="bri" min="0" max="100" value="80">
+  </div>
+  <div class="acts">
+    <button data-run="shot">📸 截图</button>
+    <button data-run="rec">⏺ 录制</button>
+    <button data-run="clip">📋 剪贴板</button>
+    <button data-run="open">🚀 打开</button>
+    <button data-run="toast">💬 弹窗</button>
+    <button data-run="shake">📳 震动</button>
+    <button data-run="tts">🔊 朗读</button>
+    <button data-run="flash">💡 闪光灯</button>
+  </div>
+</div>
+
+<div class="card">
+  <h3>远程终端 <span class="tag">adb / shell</span></h3>
+  <div id="term"><span class="d">Cinder shell v0.3 — 连接 Agent 后指令下发到手机执行</span>
+<span class="d">输入 help 查看可用命令</span>
+</div>
+  <div class="termrow">
+    <input id="tinput" placeholder="输入命令，回车执行" autocomplete="off">
+    <button id="trun">执行</button>
+  </div>
+  <div class="chips" id="chips"></div>
+</div>
+
+<div class="card">
+  <h3>画布投放 <span class="tag">Agent 屏幕涂鸦</span></h3>
+  <canvas id="mtx" width="640" height="360"></canvas>
+  <div class="acts">
+    <button data-draw="pen">✏️ 画笔</button>
+    <button data-draw="line">╱ 直线</button>
+    <button data-draw="rect">▭ 矩形</button>
+    <button data-draw="clr">🗑 清空</button>
+  </div>
+</div>
+
+<div class="card">
+  <h3>截图画廊 <span class="tag" id="galN">0 张</span></h3>
+  <div class="gal" id="gal"></div>
+</div>
+
+<div class="card">
+  <h3>录像回放 <span class="tag" id="clipN">0 段</span> <span class="tag" id="recN">待机</span></h3>
+  <div class="gal" id="clips"></div>
+</div>
+
+<div class="card">
+  <h3>文件浏览 <span class="tag">/sdcard</span></h3>
+  <div class="acts">
+    <button data-fs="/">/</button>
+    <button data-fs="/sdcard">/sdcard</button>
+    <button data-fs="/sdcard/Download">Download</button>
+    <button data-fs="/sdcard/DCIM">DCIM</button>
+  </div>
+  <div id="files"><div>点击上方路径加载…</div></div>
+</div>
+
+<div id="log"></div>
+<footer>Cinder // 远程控制台<br>前端已就绪，真实控制需手机 Agent 上线</footer>
+
+<div id="menu"></div>
+<div id="veil"></div>
+<div id="flash"></div>
+<div id="mask"></div>
+<div id="danmu"></div>
+<div id="prev"><img id="prevImg" alt=""><button id="prevClose">关闭</button></div>
+
+<script>
+var API = location.origin;
+var DEMO = false;   // 部署版：永远走真实接口，不会模拟          // 域名自适应，不写死任何地址
+var HEALTH = ['/api/health','/api/healthz','/api/status','/healthz'];
+var SHOTS = ['/api/screenshot','/screenshot'];
+
+function log(m, cls){
+  var e = document.getElementById('log');
+  var d = document.createElement('div');
+  d.textContent = new Date().toLocaleTimeString('zh-CN',{hour12:false}) + '  ' + m;
+  if (cls) d.style.color = cls;
+  e.appendChild(d); e.scrollTop = e.scrollHeight;
+  while (e.childNodes.length > 200) e.removeChild(e.firstChild);
+}
+function tlog(m, cls){
+  var t = document.getElementById('term');
+  var s = document.createElement('span');
+  s.className = cls || ''; s.textContent = m + '\n';
+  t.appendChild(s); t.scrollTop = t.scrollHeight;
+  while (t.childNodes.length > 300) t.removeChild(t.firstChild);
+}
+function toast(msg){
+  var box = document.getElementById('danmu');
+  var d = document.createElement('div');
+  d.className = 'dm'; d.textContent = msg;
+  d.style.color = '#00e0c6'; d.style.animationDuration = '2.6s';
+  d.style.top = (Math.random()*40 + 10) + '%';
+  box.appendChild(d);
+  setTimeout(function(){ d.remove(); }, 2800);
+}
+function lamp(on, txt){
+  document.getElementById('lamp').classList.toggle('on', !!on);
+  document.getElementById('lampTxt').textContent = txt || (on ? '在线' : '离线');
+}
+function setSrc(ok, txt){
+  var t = document.getElementById('srcTag');
+  t.textContent = txt; t.className = ok ? 'tag ok' : 'tag';
+}
+
+/* ---------- 健康探测（多路径兜底，根治 405） ---------- */
+function check(){
+  var i = 0;
+  (function next(){
+    if (i >= HEALTH.length){ lamp(false,'离线'); setSrc(false,'未连接'); log('健康探测：全部路径失败','#ff4d6d'); return; }
+    fetch(API + HEALTH[i++], {method:'GET'})
+      .then(function(r){ if(!r.ok) throw 0; return r.json(); })
+      .then(function(j){
+        lamp(true,'在线'); setSrc(false,'待拉流');
+        log('健康探测 OK  ' + HEALTH[i-1] + '  agent=' + (j.agents!==undefined?j.agents:'?'));
+        devices();
+      })
+      .catch(next);
+  })();
+}
+
+/* ---------- 设备 ---------- */
+function devices(){
+  fetch(API + '/api/devices').then(function(r){ return r.json(); }).then(function(d){
+    var n = (d && d.length) || 0;
+    log('设备列表：' + n + ' 台' + (n ? ' → ' + d.map(function(x){return x.id;}).join(',') : ''));
+    if (n) setSrc(false, '设备 ' + n + ' 台');
+  }).catch(function(){ log('设备列表失败','#ff4d6d'); });
+}
+
+/* ---------- 拉流 ---------- */
+var shooting = false, gal = [];
+function pull(){
+  var i = 0;
+  (function next(){
+    if (i >= SHOTS.length){
+      setSrc(false,'未连接');
+      document.getElementById('ph').style.display = 'block';
+      document.getElementById('frame').style.display = 'none';
+      if (!shooting) log('拉流失败（Agent 未上线属正常）','#ffb020');
+      return;
+    }
+    fetch(API + SHOTS[i++], {method:'GET'}).then(function(r){
+      if (!r.ok) throw 0; return r.blob();
+    }).then(function(b){
+      if (b.type.indexOf('image') < 0) throw 0;
+      var u = URL.createObjectURL(b);
+      var im = document.getElementById('frame');
+      im.onload = function(){ URL.revokeObjectURL(u); };
+      im.src = u; im.style.display = 'block';
+      document.getElementById('ph').style.display = 'none';
+      setSrc(true, '实时 ' + SHOTS[i-1]);
+    }).catch(next);
+  })();
+}
+
+/* ---------- 指令 ---------- */
+function ctrl(cmd, val){
+  var q = '/api/control?command=' + encodeURIComponent(cmd);
+  if (val !== undefined && val !== null) q += '&value=' + encodeURIComponent(val);
+  return fetch(API + q, {method:'POST'}).then(function(r){ return r.json(); }).then(function(j){
+    if (j.executed) tlog('$ ' + cmd + (val!==undefined?' '+val:'') + '  → executed on agent', 's');
+    else tlog('$ ' + cmd + '  → 排队（等待 Agent 接管）', 'd');
+    log('指令 ' + cmd + ' → ' + (j.executed ? '已执行' : '已排队'));
+    return j;
+  }).catch(function(e){
+    tlog('$ ' + cmd + '  ✗ 网络错误', 'e'); log('指令 ' + cmd + ' 网络错误','#ff4d6d');
+  });
+}
+function shell(c){
+  return fetch(API + '/api/shell', {method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({cmd:c})
+  }).then(function(r){ return r.json(); }).then(function(j){
+    tlog('$ ' + c, 's');
+    if (j.output) tlog(j.output);
+    else tlog('[已下发 Agent，等待回执]', 'd');
+  }).catch(function(){
+    tlog('$ ' + c, 's');
+    return ctrl('shell', c);
+  });
+}
+
+/* ---------- 好玩功能（截图 / 录制 / 画布 / 画廊 / 录像带） ---------- */
+function onlineIds(){ return (window.DEVICES || []).map(function(d){ return d.id; }); }
+function needDevice(what){
+  if (onlineIds().length) return true;
+  toast('没有设备在线，' + what + '无效');
+  log('x ' + what + '失败：无 Agent 在线（先在手机跑 Agent）');
+  return false;
+}
+function isPlaceholder(u){
+  var im = document.getElementById('frame');
+  try { if (im && im.naturalWidth && im.naturalWidth < 50) return true; } catch(e){}
+  return false;
+}
+function doShot(){
+  if (!needDevice('抓拍')) return;
+  var im = document.getElementById('frame');
+  if (!im || im.style.display !== 'block' || !im.src){ pull(); toast('尝试拉流'); return; }
+  if (isPlaceholder(im.src)){ toast('当前是占位画面'); log('x 占位帧不入画廊（等待 Agent 推真实画面）'); return; }
+  if (gal.length && gal[0] === im.src){ toast('与上一张相同，已跳过'); return; }
+  gal.unshift(im.src); if (gal.length > 12) gal.pop(); renderGal();
+  if (typeof ctrl === 'function') ctrl('shot', '');
+  toast('已抓拍'); log('截图已存入画廊（' + gal.length + ' 张）');
+}
+function renderGal(){
+  var g = document.getElementById('gal'); if (!g) return;
+  var n = document.getElementById('galN'); if (n) n.textContent = gal.length + ' 张';
+  g.innerHTML = '';
+  gal.forEach(function(src){
+    var w = document.createElement('div'); w.className = 'gi';
+    var i = document.createElement('img'); i.src = src;
+    i.onclick = function(){
+      document.getElementById('prevImg').src = src;
+      document.getElementById('prev').style.display = 'flex';
+    };
+    var d = document.createElement('button'); d.className = 'del'; d.textContent = 'x';
+    d.onclick = function(e){ e.stopPropagation(); gal = gal.filter(function(x){ return x !== src; }); renderGal(); };
+    w.appendChild(i); w.appendChild(d); g.appendChild(w);
+  });
+}
+var recTimer = null, recN = 0, recId = '';
+function toggleRec(){
+  var b = document.querySelector('[data-run=rec]');
+  if (recTimer){
+    clearInterval(recTimer); recTimer = null;
+    if (b) b.textContent = '录 制';
+    log('正在合成 MP4...');
+    fetch(API + '/api/record?action=stop', {method:'POST'}).then(function(r){ return r.json(); }).then(function(j){
+      if (j && j.ok && j.url){ loadClips(); toast('录制完成 ' + recN + ' 帧'); log('ok 录像已生成 ' + j.url); }
+      else { toast('合成失败'); log('x 录像合成失败：' + ((j && j.error) || '无帧')); }
+    }).catch(function(e){ log('x 录像请求失败 ' + e); });
+    return;
+  }
+  if (!needDevice('录制')) return;
+  recN = 0;
+  fetch(API + '/api/record?action=start', {method:'POST'}).then(function(r){ return r.json(); }).then(function(j){
+    recId = (j && j.id) || '';
+    if (b) b.textContent = '停 止';
+    recTimer = setInterval(function(){
+      pull();
+      var im = document.getElementById('frame');
+      if (im && im.style.display === 'block' && im.src && !isPlaceholder(im.src)){
+        fetch(im.src).then(function(r){ return r.blob(); }).then(function(bl){
+          var fr = new FileReader();
+          fr.onload = function(){
+            var hex = Array.prototype.map.call(new Uint8Array(fr.result), function(x){
+              return ('0' + x.toString(16)).slice(-2);
+            }).join('');
+            fetch(API + '/api/frame', {method:'POST',
+              headers:{'Content-Type':'application/json'}, body: JSON.stringify({data:hex, id:recId})}).catch(function(){});
+          };
+          fr.readAsArrayBuffer(bl);
+        });
+        recN++;
+        var el = document.getElementById('recN'); if (el) el.textContent = recN + ' 帧';
+      }
+    }, 1200);
+    log('录制开始（1.2s/帧，停止后合成 MP4）'); toast('录制中');
+  });
+}
+function loadClips(){
+  var box = document.getElementById('clips'); if (!box) return;
+  fetch(API + '/api/clips').then(function(r){ return r.json(); }).then(function(list){
+    var c = document.getElementById('clipN'); if (c) c.textContent = list.length + ' 段';
+    box.innerHTML = '';
+    list.forEach(function(v){
+      var w = document.createElement('div'); w.className = 'gi';
+      var vid = document.createElement('video');
+      vid.src = API + v.url; vid.controls = true; vid.preload = 'metadata';
+      var nm = document.createElement('div'); nm.className = 'cap'; nm.textContent = v.name.replace('clip-','');
+      var a = document.createElement('a'); a.className = 'dl'; a.href = API + v.url; a.download = v.name; a.textContent = 'dl';
+      w.appendChild(vid); w.appendChild(nm); w.appendChild(a); box.appendChild(w);
+    });
+  }).catch(function(){});
+}
+function cvSend(kind, p){
+  if (!needDevice('投放')) return;
+  if (typeof ctrl === 'function') ctrl('draw', kind + ':' + Math.round(p.x) + ',' + Math.round(p.y));
+}
+function initCanvas(){
+  var cv = document.getElementById('cv'); if (!cv) return;
+  var cx = cv.getContext('2d');
+  cx.fillStyle = '#05070c'; cx.fillRect(0,0,cv.width,cv.height);
+  var drawing = false, mode = 'pen', sx = 0, sy = 0, snap = null, started = false;
+  function pos(e){
+    var r = cv.getBoundingClientRect(), t = e.touches ? e.touches[0] : e;
+    return { x: (t.clientX - r.left) * cv.width / r.width, y: (t.clientY - r.top) * cv.height / r.height };
+  }
+  cv.addEventListener('pointerdown', function(e){
+    drawing = true; started = true;
+    var p = pos(e); sx = p.x; sy = p.y;
+    cx.beginPath(); cx.moveTo(sx, sy); cvSend('down', {x:sx, y:sy});
+    snap = cx.getImageData(0,0,cv.width,cv.height);
+  });
+  cv.addEventListener('pointermove', function(e){
+    if (!drawing) return;
+    var p = pos(e);
+    if (mode === 'pen'){ cx.lineTo(p.x, p.y); cx.stroke(); } else if (snap){ cx.putImageData(snap,0,0); }
+    if (mode === 'line' || mode === 'rect'){ cx.beginPath(); cx.moveTo(sx, sy); cx.lineTo(p.x, p.y); cx.stroke(); }
+    cvSend('move', p);
+  });
+  cv.addEventListener('pointerup', function(e){
+    if (!drawing) return; drawing = false;
+    if (!started) return; started = false;
+    var p = pos(e);
+    if (mode === 'rect'){ cx.strokeRect(sx, sy, p.x-sx, p.y-sy); }
+    cvSend('up', p);
+  });
+  var btns = document.querySelectorAll('[data-draw]');
+  Array.prototype.forEach.call(btns, function(b){
+    b.onclick = function(){
+      if (b.dataset.draw === 'clr'){ cx.fillStyle = '#05070c'; cx.fillRect(0,0,cv.width,cv.height); return; }
+      mode = b.dataset.draw;
+      cx.strokeStyle = mode === 'rect' ? '#f0b429' : (mode === 'line' ? '#7c6cff' : '#00e5c7');
+      cx.lineWidth = 2;
+      Array.prototype.forEach.call(btns, function(x){ if (x.dataset.draw !== 'clr') x.style.opacity = .45; });
+      b.style.opacity = 1;
+    };
+  });
+}
+
+/* ---------- 终端 ---------- */
+var CMDS = ['help','devices','ls /sdcard','screencap','input keyevent HOME','input keyevent BACK',
+            'reboot','pm list packages','getprop ro.product.model','wifi scan','brightness 80','clear'];
+document.getElementById('chips').innerHTML = CMDS.map(function(c){
+  return '<span data-cmd="' + c + '">' + c + '</span>';
+}).join('');
+document.getElementById('chips').addEventListener('click', function(e){
+  var s = e.target.closest ? e.target.closest('[data-cmd]') : null;
+  if (!s) return;
+  var c = s.getAttribute('data-cmd');
+  if (c === 'clear'){ document.getElementById('term').innerHTML = ''; return; }
+  if (c === 'help'){
+    tlog('可用：devices / ls <path> / screencap / input keyevent <K> / brightness <0-100> / pm list / getprop / reboot', 'd');
+    return;
+  }
+  shell(c);
+});
+function runCmd(){
+  var i = document.getElementById('tinput'), v = i.value.trim();
+  if (!v) return; i.value = '';
+  if (v === 'clear'){ document.getElementById('term').innerHTML = ''; return; }
+  if (v === 'help'){
+    tlog('可用：devices / ls <path> / screencap / input keyevent <K> / brightness <0-100> / pm list / getprop / reboot', 'd');
+    return;
+  }
+  shell(v);
+}
+document.getElementById('trun').onclick = runCmd;
+document.getElementById('tinput').addEventListener('keydown', function(e){ if (e.key === 'Enter') runCmd(); });
+
+/* ---------- 亮度滑杆 ---------- */
+document.getElementById('bri').addEventListener('input', function(){
+  document.getElementById('briVal').textContent = this.value + '%';
+});
+document.getElementById('bri').addEventListener('change', function(){
+  ctrl('brightness', parseInt(this.value, 10));
+});
+
+/* ---------- 启动 ---------- */
+log('控制台启动  ' + API);
+check(); pull();
+setInterval(function(){ if (!document.hidden) check(); }, 15000);
+setInterval(function(){ if (!document.hidden && document.getElementById('lamp').classList.contains('on')) pull(); }, 4000);
+</script>
+</body>
+</html>tyle:normal;margin:0 4px}
+.iconbtn{width:38px;height:38px;border-radius:11px;border:1px solid var(--line);
+  background:var(--card);color:var(--txt);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.iconbtn:active{transform:scale(.94)}
+#lamp{display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:20px;
+  border:1px solid var(--line);background:var(--card);font-size:12px;white-space:nowrap}
+#dot{width:8px;height:8px;border-radius:50%;background:var(--red);box-shadow:0 0 8px var(--red)}
+#lamp.on #dot{background:var(--grn);box-shadow:0 0 8px var(--grn)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:13px;margin-bottom:12px}
+.card h3{font-size:13px;color:var(--dim);font-weight:600;margin-bottom:9px;display:flex;align-items:center;gap:6px}
+.card h3 .tag{font-size:10px;padding:2px 7px;border-radius:9px;background:rgba(255,77,109,.15);color:var(--red)}
+.card h3 .tag.ok{background:rgba(46,199,122,.15);color:var(--grn)}
+/* 实时画面 */
+#screen{position:relative;width:100%;aspect-ratio:9/16;max-height:52vh;background:#000;
+  border-radius:12px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+#screen img{width:100%;height:100%;object-fit:cover;display:block}
+#ph{position:absolute;text-align:center;color:var(--dim);font-size:13px;line-height:1.9;padding:20px}
+#ph div:first-child{font-size:30px;margin-bottom:8px;opacity:.5}
+#cross{position:absolute;inset:0;pointer-events:none;display:none}
+#cross::before,#cross::after{content:"";position:absolute;background:rgba(124,92,255,.35)}
+#cross::before{left:50%;top:0;width:1px;height:100%}
+#cross::after{top:50%;left:0;height:1px;width:100%}
+/* 控制键 */
+.pad{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.pad button,.acts button{background:var(--card2);border:1px solid var(--line);color:var(--txt);
+  border-radius:11px;padding:12px 4px;font-size:12px;cursor:pointer;transition:.12s}
+.pad button:active,.acts button:active{background:var(--acc);border-color:var(--acc);transform:scale(.95)}
+.acts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}
+.acts button.danger:active{background:var(--red);border-color:var(--red)}
+/* 滑杆 */
+.slider{margin-top:10px}
+.slider label{font-size:11px;color:var(--dim);display:flex;justify-content:center;gap:8px;margin-bottom:5px}
+input[type=range]{width:100%;-webkit-appearance:none;height:4px;border-radius:2px;background:var(--line);outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;
+  background:var(--acc);border:2px solid #fff;box-shadow:0 0 8px rgba(124,92,255,.6)}
+/* 终端 */
+#term{background:#05070c;border:1px solid var(--line);border-radius:10px;padding:9px;
+  height:160px;overflow-y:auto;font-family:ui-monospace,Menlo,Consolas,monospace;
+  font-size:11px;line-height:1.55;color:#9dffcf;white-space:pre-wrap;word-break:break-all}
+#term .e{color:var(--red)} #term .s{color:var(--acc2)} #term .d{color:var(--dim)}
+.termrow{display:flex;gap:7px;margin-top:8px}
+.termrow input{flex:1;background:#05070c;border:1px solid var(--line);border-radius:9px;
+  padding:9px 10px;color:var(--txt);font-size:12px;font-family:monospace;outline:none}
+.termrow button{background:var(--acc);border:0;border-radius:9px;padding:9px 14px;color:#fff;font-size:12px;cursor:pointer}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.chips span{font-size:10px;padding:4px 9px;border-radius:8px;background:var(--card2);
+  border:1px solid var(--line);color:var(--dim);cursor:pointer}
+.chips span:active{background:var(--acc);color:#fff}
+/* 画笔 */
+#mtx{width:100%;aspect-ratio:16/9;background:#05070c;border:1px solid var(--line);
+  border-radius:10px;touch-action:none;display:block}
+/* 画廊 */
+.gal{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:9px}
+.gal img{width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:7px;background:#000;cursor:pointer}
+/* 文件 */
+#files{font-family:monospace;font-size:11px;line-height:1.8;color:var(--dim);
+  max-height:170px;overflow-y:auto;background:#05070c;border-radius:9px;padding:8px;margin-top:9px}
+#files div:active{color:var(--acc2)}
+/* 日志 */
+#log{display:none;background:#05070c;border:1px solid var(--line);border-radius:9px;
+  padding:8px;font-family:monospace;font-size:10px;line-height:1.6;color:var(--dim);
+  height:120px;overflow-y:auto;margin-top:10px;white-space:pre-wrap}
+/* 下拉菜单 */
+#menu{position:absolute;top:60px;right:14px;width:186px;z-index:99;
+  background:#12151f;border:1px solid #2b3145;border-radius:13px;padding:6px;display:none;
+  box-shadow:0 14px 40px rgba(0,0,0,.6)}
+#menu button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;
+  background:transparent;border:0;color:var(--txt);padding:10px 9px;border-radius:9px;font-size:12px;cursor:pointer}
+#menu button:active{background:var(--acc)}
+#menu button small{margin-left:auto;color:var(--dim);font-size:10px}
+#menu hr{border:0;border-top:1px solid var(--line);margin:5px 8px}
+#veil{position:fixed;inset:0;z-index:98;display:none}
+/* 弹幕 */
+#danmu{position:fixed;left:0;right:0;top:22%;z-index:120;pointer-events:none}
+.dm{position:absolute;right:-40vw;white-space:nowrap;font-size:19px;font-weight:800;
+  color:#fff;text-shadow:0 0 12px var(--acc),0 0 3px #000;animation:fly 5.5s linear forwards}
+@keyframes fly{to{right:105vw}}
+/* 灯效 */
+#flash{position:fixed;inset:0;z-index:130;pointer-events:none;opacity:0;
+  background:radial-gradient(circle,rgba(124,92,255,.35),transparent 65%);transition:opacity .18s}
+#flash.go{opacity:1}
+#mask{position:fixed;inset:0;z-index:140;background:#000;opacity:0;
+  pointer-events:none;transition:opacity .45s}
+#mask.on{opacity:1}
+/* 预览 */
+#prev{position:fixed;inset:0;z-index:150;background:rgba(0,0,0,.94);display:none;
+  align-items:center;justify-content:center;flex-direction:column;gap:12px}
+#prev img{max-width:94vw;max-height:80vh;border-radius:12px}
+#prev button{background:var(--acc);border:0;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px}
+footer{text-align:center;color:#3d4354;font-size:10px;margin-top:16px;line-height:1.8}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand"><b>Cinder</b><i>//</i>远程控制台</div>
+  <div id="lamp"><span id="dot"></span><span id="lampTxt">离线</span></div>
+  <button class="iconbtn" id="btnMenu" data-act="menu">&#9776;</button>
+</header>
+
+<div class="card">
+  <h3>实时画面 <span class="tag" id="srcTag">未连接</span></h3>
+  <div id="screen">
+    <div id="ph"><div>&#128225;</div><div>等待 Agent 接管</div><div style="font-size:11px;opacity:.7">手机 Agent 上线后此处显示真实画面</div></div>
+    <img id="frame" alt="" style="display:none">
+    <div id="cross"></div>
+  </div>
+  <div class="pad">
+    <button data-key="UP">▲</button>
+    <button data-key="HOME">&#8962;</button>
+    <button data-key="BACK">&#8630;</button>
+    <button data-key="MENU">&#9776;</button>
+    <button data-key="LEFT">◀</button>
+    <button data-key="OK">●</button>
+    <button data-key="RIGHT">▶</button>
+    <button data-key="RECENT">&#9633;</button>
+    <button data-key="VOL-">🔉</button>
+    <button data-key="DOWN">▼</button>
+    <button data-key="VOL+">🔊</button>
+    <button data-key="POWER" class="danger">&#9211;</button>
+  </div>
+  <div class="slider">
+    <label><span>亮度</span><span id="briVal">80%</span></label>
+    <input type="range" id="bri" min="0" max="100" value="80">
+  </div>
+  <div class="acts">
+    <button data-run="shot">📸 截图</button>
+    <button data-run="rec">⏺ 录制</button>
+    <button data-run="clip">📋 剪贴板</button>
+    <button data-run="open">🚀 打开</button>
+    <button data-run="toast">💬 弹窗</button>
+    <button data-run="shake">📳 震动</button>
+    <button data-run="tts">🔊 朗读</button>
+    <button data-run="flash">💡 闪光灯</button>
+  </div>
+</div>
+
+<div class="card">
+  <h3>远程终端 <span class="tag">adb / shell</span></h3>
+  <div id="term"><span class="d">Cinder shell v0.3 — 连接 Agent 后指令下发到手机执行</span>
+<span class="d">输入 help 查看可用命令</span>
+</div>
+  <div class="termrow">
+    <input id="tinput" placeholder="输入命令，回车执行" autocomplete="off">
+    <button id="trun">执行</button>
+  </div>
+  <div class="chips" id="chips"></div>
+</div>
+
+<div class="card">
+  <h3>画布投放 <span class="tag">Agent 屏幕涂鸦</span></h3>
+  <canvas id="mtx" width="640" height="360"></canvas>
+  <div class="acts">
+    <button data-draw="pen">✏️ 画笔</button>
+    <button data-draw="line">╱ 直线</button>
+    <button data-draw="rect">▭ 矩形</button>
+    <button data-draw="clr">🗑 清空</button>
+  </div>
+</div>
+
+<div class="card">
+  <h3>截图画廊 <span class="tag" id="galN">0 张</span></h3>
+  <div class="gal" id="gal"></div>
+</div>
+
+<div class="card">
+  <h3>录像回放 <span class="tag" id="clipN">0 段</span> <span class="tag" id="recN">待机</span></h3>
+  <div class="gal" id="clips"></div>
+</div>
+
+<div class="card">
+  <h3>文件浏览 <span class="tag">/sdcard</span></h3>
+  <div class="acts">
+    <button data-fs="/">/</button>
+    <button data-fs="/sdcard">/sdcard</button>
+    <button data-fs="/sdcard/Download">Download</button>
+    <button data-fs="/sdcard/DCIM">DCIM</button>
+  </div>
+  <div id="files"><div>点击上方路径加载…</div></div>
+</div>
+
+<div id="log"></div>
+<footer>Cinder // 远程控制台<br>前端已就绪，真实控制需手机 Agent 上线</footer>
+
+<div id="menu"></div>
+<div id="veil"></div>
+<div id="flash"></div>
+<div id="mask"></div>
+<div id="danmu"></div>
+<div id="prev"><img id="prevImg" alt=""><button id="prevClose">关闭</button></div>
+
+<script>
+var API = location.origin;
+var DEMO = false;   // 部署版：永远走真实接口，不会模拟          // 域名自适应，不写死任何地址
+var HEALTH = ['/api/health','/api/healthz','/api/status','/healthz'];
+var SHOTS = ['/api/screenshot','/screenshot'];
+
+function log(m, cls){
+  var e = document.getElementById('log');
+  var d = document.createElement('div');
+  d.textContent = new Date().toLocaleTimeString('zh-CN',{hour12:false}) + '  ' + m;
+  if (cls) d.style.color = cls;
+  e.appendChild(d); e.scrollTop = e.scrollHeight;
+  while (e.childNodes.length > 200) e.removeChild(e.firstChild);
+}
+function tlog(m, cls){
+  var t = document.getElementById('term');
+  var s = document.createElement('span');
+  s.className = cls || ''; s.textContent = m + '\n';
+  t.appendChild(s); t.scrollTop = t.scrollHeight;
+  while (t.childNodes.length > 300) t.removeChild(t.firstChild);
+}
+function toast(msg){
+  var box = document.getElementById('danmu');
+  var d = document.createElement('div');
+  d.className = 'dm'; d.textContent = msg;
+  d.style.color = '#00e0c6'; d.style.animationDuration = '2.6s';
+  d.style.top = (Math.random()*40 + 10) + '%';
+  box.appendChild(d);
+  setTimeout(function(){ d.remove(); }, 2800);
+}
+function lamp(on, txt){
+  document.getElementById('lamp').classList.toggle('on', !!on);
+  document.getElementById('lampTxt').textContent = txt || (on ? '在线' : '离线');
+}
+function setSrc(ok, txt){
+  var t = document.getElementById('srcTag');
+  t.textContent = txt; t.className = ok ? 'tag ok' : 'tag';
+}
+
+/* ---------- 健康探测（多路径兜底，根治 405） ---------- */
+function check(){
+  var i = 0;
+  (function next(){
+    if (i >= HEALTH.length){ lamp(false,'离线'); setSrc(false,'未连接'); log('健康探测：全部路径失败','#ff4d6d'); return; }
+    fetch(API + HEALTH[i++], {method:'GET'})
+      .then(function(r){ if(!r.ok) throw 0; return r.json(); })
+      .then(function(j){
+        lamp(true,'在线'); setSrc(false,'待拉流');
+        log('健康探测 OK  ' + HEALTH[i-1] + '  agent=' + (j.agents!==undefined?j.agents:'?'));
+        devices();
+      })
+      .catch(next);
+  })();
+}
+
+/* ---------- 设备 ---------- */
+function devices(){
+  fetch(API + '/api/devices').then(function(r){ return r.json(); }).then(function(d){
+    var n = (d && d.length) || 0;
+    log('设备列表：' + n + ' 台' + (n ? ' → ' + d.map(function(x){return x.id;}).join(',') : ''));
+    if (n) setSrc(false, '设备 ' + n + ' 台');
+  }).catch(function(){ log('设备列表失败','#ff4d6d'); });
+}
+
+/* ---------- 拉流 ---------- */
+var shooting = false, gal = [];
+function pull(){
+  var i = 0;
+  (function next(){
+    if (i >= SHOTS.length){
+      setSrc(false,'未连接');
+      document.getElementById('ph').style.display = 'block';
+      document.getElementById('frame').style.display = 'none';
+      if (!shooting) log('拉流失败（Agent 未上线属正常）','#ffb020');
+      return;
+    }
+    fetch(API + SHOTS[i++], {method:'GET'}).then(function(r){
+      if (!r.ok) throw 0; return r.blob();
+    }).then(function(b){
+      if (b.type.indexOf('image') < 0) throw 0;
+      var u = URL.createObjectURL(b);
+      var im = document.getElementById('frame');
+      im.onload = function(){ URL.revokeObjectURL(u); };
+      im.src = u; im.style.display = 'block';
+      document.getElementById('ph').style.display = 'none';
+      setSrc(true, '实时 ' + SHOTS[i-1]);
+    }).catch(next);
+  })();
+}
+
+/* ---------- 指令 ---------- */
+function ctrl(cmd, val){
+  var q = '/api/control?command=' + encodeURIComponent(cmd);
+  if (val !== undefined && val !== null) q += '&value=' + encodeURIComponent(val);
+  return fetch(API + q, {method:'POST'}).then(function(r){ return r.json(); }).then(function(j){
+    if (j.executed) tlog('$ ' + cmd + (val!==undefined?' '+val:'') + '  → executed on agent', 's');
+    else tlog('$ ' + cmd + '  → 排队（等待 Agent 接管）', 'd');
+    log('指令 ' + cmd + ' → ' + (j.executed ? '已执行' : '已排队'));
+    return j;
+  }).catch(function(e){
+    tlog('$ ' + cmd + '  ✗ 网络错误', 'e'); log('指令 ' + cmd + ' 网络错误','#ff4d6d');
+  });
+}
+function shell(c){
+  return fetch(API + '/api/shell', {method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({cmd:c})
+  }).then(function(r){ return r.json(); }).then(function(j){
+    tlog('$ ' + c, 's');
+    if (j.output) tlog(j.output);
+    else tlog('[已下发 Agent，等待回执]', 'd');
+  }).catch(function(){
+    tlog('$ ' + c, 's');
+    return ctrl('shell', c);
+  });
+}
+
+/* ---------- 好玩功能（截图 / 录制 / 画布 / 画廊 / 录像带） ---------- */
+function onlineIds(){ return (window.DEVICES || []).map(function(d){ return d.id; }); }
+function needDevice(what){
+  if (onlineIds().length) return true;
+  toast('没有设备在线，' + what + '无效');
+  log('x ' + what + '失败：无 Agent 在线（先在手机跑 Agent）');
+  return false;
+}
+function isPlaceholder(u){
+  var im = document.getElementById('frame');
+  try { if (im && im.naturalWidth && im.naturalWidth < 50) return true; } catch(e){}
+  return false;
+}
+function doShot(){
+  if (!needDevice('抓拍')) return;
+  var im = document.getElementById('frame');
+  if (!im || im.style.display !== 'block' || !im.src){ pull(); toast('尝试拉流'); return; }
+  if (isPlaceholder(im.src)){ toast('当前是占位画面'); log('x 占位帧不入画廊（等待 Agent 推真实画面）'); return; }
+  if (gal.length && gal[0] === im.src){ toast('与上一张相同，已跳过'); return; }
+  gal.unshift(im.src); if (gal.length > 12) gal.pop(); renderGal();
+  if (typeof ctrl === 'function') ctrl('shot', '');
+  toast('已抓拍'); log('截图已存入画廊（' + gal.length + ' 张）');
+}
+function renderGal(){
+  var g = document.getElementById('gal'); if (!g) return;
+  var n = document.getElementById('galN'); if (n) n.textContent = gal.length + ' 张';
+  g.innerHTML = '';
+  gal.forEach(function(src){
+    var w = document.createElement('div'); w.className = 'gi';
+    var i = document.createElement('img'); i.src = src;
+    i.onclick = function(){
+      document.getElementById('prevImg').src = src;
+      document.getElementById('prev').style.display = 'flex';
+    };
+    var d = document.createElement('button'); d.className = 'del'; d.textContent = 'x';
+    d.onclick = function(e){ e.stopPropagation(); gal = gal.filter(function(x){ return x !== src; }); renderGal(); };
+    w.appendChild(i); w.appendChild(d); g.appendChild(w);
+  });
+}
+var recTimer = null, recN = 0, recId = '';
+function toggleRec(){
+  var b = document.querySelector('[data-run=rec]');
+  if (recTimer){
+    clearInterval(recTimer); recTimer = null;
+    if (b) b.textContent = '录 制';
+    log('正在合成 MP4...');
+    fetch(API + '/api/record?action=stop', {method:'POST'}).then(function(r){ return r.json(); }).then(function(j){
+      if (j && j.ok && j.url){ loadClips(); toast('录制完成 ' + recN + ' 帧'); log('ok 录像已生成 ' + j.url); }
+      else { toast('合成失败'); log('x 录像合成失败：' + ((j && j.error) || '无帧')); }
+    }).catch(function(e){ log('x 录像请求失败 ' + e); });
+    return;
+  }
+  if (!needDevice('录制')) return;
+  recN = 0;
+  fetch(API + '/api/record?action=start', {method:'POST'}).then(function(r){ return r.json(); }).then(function(j){
+    recId = (j && j.id) || '';
+    if (b) b.textContent = '停 止';
+    recTimer = setInterval(function(){
+      pull();
+      var im = document.getElementById('frame');
+      if (im && im.style.display === 'block' && im.src && !isPlaceholder(im.src)){
+        fetch(im.src).then(function(r){ return r.blob(); }).then(function(bl){
+          var fr = new FileReader();
+          fr.onload = function(){
+            var hex = Array.prototype.map.call(new Uint8Array(fr.result), function(x){
+              return ('0' + x.toString(16)).slice(-2);
+            }).join('');
+            fetch(API + '/api/frame', {method:'POST',
+              headers:{'Content-Type':'application/json'}, body: JSON.stringify({data:hex, id:recId})}).catch(function(){});
+          };
+          fr.readAsArrayBuffer(bl);
+        });
+        recN++;
+        var el = document.getElementById('recN'); if (el) el.textContent = recN + ' 帧';
+      }
+    }, 1200);
+    log('录制开始（1.2s/帧，停止后合成 MP4）'); toast('录制中');
+  });
+}
+function loadClips(){
+  var box = document.getElementById('clips'); if (!box) return;
+  fetch(API + '/api/clips').then(function(r){ return r.json(); }).then(function(list){
+    var c = document.getElementById('clipN'); if (c) c.textContent = list.length + ' 段';
+    box.innerHTML = '';
+    list.forEach(function(v){
+      var w = document.createElement('div'); w.className = 'gi';
+      var vid = document.createElement('video');
+      vid.src = API + v.url; vid.controls = true; vid.preload = 'metadata';
+      var nm = document.createElement('div'); nm.className = 'cap'; nm.textContent = v.name.replace('clip-','');
+      var a = document.createElement('a'); a.className = 'dl'; a.href = API + v.url; a.download = v.name; a.textContent = 'dl';
+      w.appendChild(vid); w.appendChild(nm); w.appendChild(a); box.appendChild(w);
+    });
+  }).catch(function(){});
+}
+function cvSend(kind, p){
+  if (!needDevice('投放')) return;
+  if (typeof ctrl === 'function') ctrl('draw', kind + ':' + Math.round(p.x) + ',' + Math.round(p.y));
+}
+function initCanvas(){
+  var cv = document.getElementById('cv'); if (!cv) return;
+  var cx = cv.getContext('2d');
+  cx.fillStyle = '#05070c'; cx.fillRect(0,0,cv.width,cv.height);
+  var drawing = false, mode = 'pen', sx = 0, sy = 0, snap = null, started = false;
+  function pos(e){
+    var r = cv.getBoundingClientRect(), t = e.touches ? e.touches[0] : e;
+    return { x: (t.clientX - r.left) * cv.width / r.width, y: (t.clientY - r.top) * cv.height / r.height };
+  }
+  cv.addEventListener('pointerdown', function(e){
+    drawing = true; started = true;
+    var p = pos(e); sx = p.x; sy = p.y;
+    cx.beginPath(); cx.moveTo(sx, sy); cvSend('down', {x:sx, y:sy});
+    snap = cx.getImageData(0,0,cv.width,cv.height);
+  });
+  cv.addEventListener('pointermove', function(e){
+    if (!drawing) return;
+    var p = pos(e);
+    if (mode === 'pen'){ cx.lineTo(p.x, p.y); cx.stroke(); } else if (snap){ cx.putImageData(snap,0,0); }
+    if (mode === 'line' || mode === 'rect'){ cx.beginPath(); cx.moveTo(sx, sy); cx.lineTo(p.x, p.y); cx.stroke(); }
+    cvSend('move', p);
+  });
+  cv.addEventListener('pointerup', function(e){
+    if (!drawing) return; drawing = false;
+    if (!started) return; started = false;
+    var p = pos(e);
+    if (mode === 'rect'){ cx.strokeRect(sx, sy, p.x-sx, p.y-sy); }
+    cvSend('up', p);
+  });
+  var btns = document.querySelectorAll('[data-draw]');
+  Array.prototype.forEach.call(btns, function(b){
+    b.onclick = function(){
+      if (b.dataset.draw === 'clr'){ cx.fillStyle = '#05070c'; cx.fillRect(0,0,cv.width,cv.height); return; }
+      mode = b.dataset.draw;
+      cx.strokeStyle = mode === 'rect' ? '#f0b429' : (mode === 'line' ? '#7c6cff' : '#00e5c7');
+      cx.lineWidth = 2;
+      Array.prototype.forEach.call(btns, function(x){ if (x.dataset.draw !== 'clr') x.style.opacity = .45; });
+      b.style.opacity = 1;
+    };
+  });
+}
+
+/* ---------- 终端 ---------- */
+var CMDS = ['help','devices','ls /sdcard','screencap','input keyevent HOME','input keyevent BACK',
+            'reboot','pm list packages','getprop ro.product.model','wifi scan','brightness 80','clear'];
+document.getElementById('chips').innerHTML = CMDS.map(function(c){
+  return '<span data-cmd="' + c + '">' + c + '</span>';
+}).join('');
+document.getElementById('chips').addEventListener('click', function(e){
+  var s = e.target.closest ? e.target.closest('[data-cmd]') : null;
+  if (!s) return;
+  var c = s.getAttribute('data-cmd');
+  if (c === 'clear'){ document.getElementById('term').innerHTML = ''; return; }
+  if (c === 'help'){
+    tlog('可用：devices / ls <path> / screencap / input keyevent <K> / brightness <0-100> / pm list / getprop / reboot', 'd');
+    return;
+  }
+  shell(c);
+});
+function runCmd(){
+  var i = document.getElementById('tinput'), v = i.value.trim();
+  if (!v) return; i.value = '';
+  if (v === 'clear'){ document.getElementById('term').innerHTML = ''; return; }
+  if (v === 'help'){
+    tlog('可用：devices / ls <path> / screencap / input keyevent <K> / brightness <0-100> / pm list / getprop / reboot', 'd');
+    return;
+  }
+  shell(v);
+}
+document.getElementById('trun').onclick = runCmd;
+document.getElementById('tinput').addEventListener('keydown', function(e){ if (e.key === 'Enter') runCmd(); });
+
+/* ---------- 亮度滑杆 ---------- */
+document.getElementById('bri').addEventListener('input', function(){
+  document.getElementById('briVal').textContent = this.value + '%';
+});
+document.getElementById('bri').addEventListener('change', function(){
+  ctrl('brightness', parseInt(this.value, 10));
+});
+
+/* ---------- 启动 ---------- */
+log('控制台启动  ' + API);
+check(); pull();
+setInterval(function(){ if (!document.hidden) check(); }, 15000);
+setInterval(function(){ if (!document.hidden && document.getElementById('lamp').classList.contains('on')) pull(); }, 4000);
+
+/* 自启：画布 + 录像带 */
+try{ initCanvas(); loadClips(); setInterval(loadClips, 15000); }catch(e){}
+</script>
+</body>
+</html>
