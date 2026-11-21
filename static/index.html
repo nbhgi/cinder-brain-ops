@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Cinder // 控制台</title>
+<style>
+:root{
+  --glass:rgba(255,255,255,.10);
+  --glass-2:rgba(255,255,255,.16);
+  --stroke:rgba(255,255,255,.22);
+  --txt:#f2f5ff;
+  --sub:rgba(242,245,255,.62);
+  --acc:#7c5cff;
+  --acc2:#22d3ee;
+  --ok:#37e6a0;
+  --warn:#ffcc4d;
+  --bad:#ff5d73;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  min-height:100dvh;
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Microsoft YaHei",sans-serif;
+  color:var(--txt);
+  background:radial-gradient(120% 80% at 12% 0%,#2a1d5e 0%,transparent 55%),
+             radial-gradient(120% 70% at 92% 8%,#0d3f57 0%,transparent 50%),
+             linear-gradient(180deg,#0a0b16 0%,#07080f 100%);
+  background-attachment:fixed;
+  overflow-x:hidden;
+}
+.blob{position:fixed;border-radius:50%;filter:blur(70px);opacity:.5;pointer-events:none;z-index:0;animation:float 14s ease-in-out infinite}
+.b1{width:46vw;height:46vw;background:#6a4bff;top:-8vw;left:-10vw}
+.b2{width:38vw;height:38vw;background:#00b8d4;top:22vh;right:-12vw;animation-delay:-5s}
+.b3{width:30vw;height:30vw;background:#ff4d94;bottom:-8vw;left:18vw;animation-delay:-9s}
+@keyframes float{50%{transform:translate3d(3vw,-4vh,0) scale(1.08)}}
+
+/* 常驻网络胶囊：右上角，不用打开 */
+#netPill{
+  position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);right:12px;z-index:60;
+  display:flex;align-items:center;gap:7px;
+  padding:7px 12px 7px 10px;border-radius:999px;
+  background:var(--glass);backdrop-filter:blur(18px) saturate(1.6);-webkit-backdrop-filter:blur(18px) saturate(1.6);
+  border:1px solid var(--stroke);
+  box-shadow:0 6px 20px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.25);
+  font-size:12px;font-weight:600;letter-spacing:.2px;cursor:pointer;
+  transition:transform .18s;
+}
+#netPill:active{transform:scale(.94)}
+.bars{display:flex;align-items:flex-end;gap:2px;height:12px}
+.bars i{width:3px;border-radius:1px;background:currentColor;opacity:.28;transition:opacity .2s}
+.bars i:nth-child(1){height:4px}
+.bars i:nth-child(2){height:6px}
+.bars i:nth-child(3){height:9px}
+.bars i:nth-child(4){height:12px}
+.bars.on i{opacity:1}
+#netPill .dot{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor}
+#netPill.wait{color:var(--warn)}
+#netPill.good{color:var(--ok)}
+#netPill.bad{color:var(--bad)}
+#netPill .ms{color:var(--sub);font-weight:500}
+
+.wrap{position:relative;z-index:1;max-width:520px;margin:0 auto;padding:64px 16px 40px}
+
+/* 顶部设备条 */
+#devBar{display:flex;align-items:center;gap:10px;margin-bottom:18px;padding:10px 14px;border-radius:16px;
+  background:var(--glass);border:1px solid var(--stroke);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);font-size:13px}
+#devBar .led{width:8px;height:8px;border-radius:50%;background:var(--bad);box-shadow:0 0 8px var(--bad)}
+#devBar.online .led{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+#devBar .name{font-weight:600}
+#devBar .cnt{margin-left:auto;color:var(--sub);font-size:12px}
+
+h1{font-size:30px;line-height:1.15;margin:6px 0 6px;letter-spacing:-.5px;font-weight:700}
+.sub{color:var(--sub);font-size:13px;margin-bottom:22px}
+
+/* 主卡片：实时视频（封面流） */
+#heroCard{
+  position:relative;display:block;width:100%;text-align:left;color:inherit;cursor:pointer;
+  border-radius:26px;overflow:hidden;
+  background:linear-gradient(135deg,rgba(124,92,255,.30),rgba(34,211,238,.18));
+  border:1px solid var(--stroke);
+  backdrop-filter:blur(20px) saturate(1.5);-webkit-backdrop-filter:blur(20px) saturate(1.5);
+  box-shadow:0 18px 50px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.28);
+  transition:transform .22s cubic-bezier(.2,.8,.2,1);
+}
+#heroCard:active{transform:scale(.975)}
+#heroCard .cover{width:100%;aspect-ratio:16/10;object-fit:cover;display:block;opacity:.9}
+#heroCard .nocover{width:100%;aspect-ratio:16/10;display:grid;place-items:center;gap:6px;
+  background:repeating-linear-gradient(135deg,rgba(255,255,255,.05) 0 10px,rgba(255,255,255,.02) 10px 20px)}
+#heroCard .nocover b{font-size:15px;font-weight:600}
+#heroCard .nocover span{font-size:11px;color:var(--sub)}
+#heroCard .veil{position:absolute;inset:0;background:linear-gradient(180deg,transparent 45%,rgba(6,7,15,.82))}
+#heroCard .meta{position:absolute;left:16px;right:16px;bottom:14px;display:flex;align-items:center;gap:8px}
+#heroCard .tag{font-size:11px;font-weight:600;padding:4px 9px;border-radius:999px;background:var(--glass-2);border:1px solid var(--stroke)}
+#heroCard .tag.live{background:rgba(55,230,160,.18);border-color:rgba(55,230,160,.45);color:#bdffe4}
+#heroCard .go{margin-left:auto;font-size:12px;color:var(--sub)}
+
+.sec{display:flex;align-items:center;gap:8px;margin:24px 2px 10px;font-size:12px;color:var(--sub);letter-spacing:1px;text-transform:uppercase}
+
+/* 灵动岛：点按触发控制类功能 */
+#island{
+  position:relative;width:100%;border-radius:22px;padding:12px;
+  background:var(--glass);border:1px solid var(--stroke);
+  backdrop-filter:blur(20px) saturate(1.6);-webkit-backdrop-filter:blur(20px) saturate(1.6);
+  box-shadow:0 14px 40px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.25);
+  display:flex;align-items:center;gap:10px;
+}
+#island .pill{
+  flex:1;min-width:0;display:flex;align-items:center;gap:8px;justify-content:center;
+  padding:11px 10px;border-radius:14px;cursor:pointer;
+  background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.10);
+  font-size:12px;font-weight:600;transition:transform .15s,background .2s;
+}
+#island .pill:active{transform:scale(.95);background:rgba(124,92,255,.28)}
+#island .pill b{font-size:14px}
+#island .more{
+  width:44px;height:44px;flex:none;display:grid;place-items:center;border-radius:50%;cursor:pointer;
+  background:linear-gradient(135deg,var(--acc),var(--acc2));border:0;color:#fff;font-size:18px;
+  box-shadow:0 6px 18px rgba(124,92,255,.5);transition:transform .2s;
+}
+#island .more:active{transform:scale(.9) rotate(45deg)}
+#island .more.open{transform:rotate(45deg)}
+
+#islandGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px;overflow:hidden;max-height:0;opacity:0;transition:max-height .3s,opacity .25s}
+#islandGrid.open{max-height:420px;opacity:1}
+.icard{
+  display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;
+  padding:11px 4px;border-radius:14px;font-size:10.5px;text-align:center;line-height:1.2;color:var(--txt);
+  background:var(--glass);border:1px solid var(--stroke);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  transition:transform .15s,background .2s;
+}
+.icard:active{transform:scale(.93);background:rgba(124,92,255,.3)}
+.icard b{font-size:18px;font-weight:400}
+.icard.off{opacity:.42}
+
+/* 功能网格 */
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.tile{
+  position:relative;overflow:hidden;cursor:pointer;text-align:left;color:inherit;
+  padding:14px;border-radius:18px;min-height:84px;
+  background:var(--glass);border:1px solid var(--stroke);
+  backdrop-filter:blur(16px) saturate(1.4);-webkit-backdrop-filter:blur(16px) saturate(1.4);
+  box-shadow:0 8px 26px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.22);
+  transition:transform .18s;
+}
+.tile:active{transform:scale(.97)}
+.tile b{display:block;font-size:14px;margin-bottom:3px}
+.tile span{font-size:11px;color:var(--sub);line-height:1.35}
+.tile .em{position:absolute;right:10px;top:9px;font-size:20px;opacity:.85}
+.tile.wide{grid-column:span 2;min-height:0;display:flex;align-items:center;gap:10px}
+
+footer{margin-top:26px;text-align:center;font-size:11px;color:var(--sub);line-height:1.7}
+
+/* island v1.5 */
+#islandWrap{position:sticky;top:0;z-index:2147483000;margin:0 -16px 10px;padding:6px 16px 8px;
+  background:linear-gradient(180deg,rgba(18,16,38,.92),rgba(18,16,38,0));backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);contain:layout style}
+#island{position:relative;width:168px;height:34px;margin:0 auto;border-radius:20px;cursor:pointer;
+  background:linear-gradient(180deg,#2a2740,#171524);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.14),0 6px 18px rgba(0,0,0,.45);
+  display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;color:#cfc9e6;
+  transition:width .34s cubic-bezier(.2,.85,.2,1),height .34s cubic-bezier(.2,.85,.2,1),border-radius .34s;
+  contain:layout style}
+#island .dot{width:7px;height:7px;border-radius:50%;background:#ff5b5b;box-shadow:0 0 6px #ff5b5b;flex:none}
+#island.on .dot{background:#3ddc84;box-shadow:0 0 6px #3ddc84}
+#island .cam{position:absolute;right:12px;top:11px;width:12px;height:12px;border-radius:50%;
+  background:radial-gradient(circle at 32% 32%,#3b3760,#0c0a14)}
+#curtain{position:fixed;left:0;right:0;top:0;z-index:998;transform:translateY(-105%);
+  transition:transform .34s cubic-bezier(.2,.85,.2,1);contain:layout style}
+#curtain.open{transform:translateY(0)}
+#curtain .panel{margin:52px 12px 0;border-radius:18px;padding:12px 12px 14px;max-height:74vh;overflow:auto;
+  background:rgba(24,21,42,.82);backdrop-filter:blur(18px) saturate(1.3);-webkit-backdrop-filter:blur(18px) saturate(1.3);
+  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.16),0 18px 40px rgba(0,0,0,.5)}
+#curtain .ttl{font-size:12px;opacity:.6;margin:2px 0 8px}
+#curtain .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+#curtain button{appearance:none;border:0;border-radius:12px;padding:9px 4px;font-size:11px;color:#e8e5f5;
+  background:rgba(255,255,255,.07);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.12);cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:3px;line-height:1.2;min-height:48px;justify-content:center}
+#curtain button:active{transform:scale(.94);background:rgba(255,255,255,.14)}
+#curtain button b{font-size:14px;font-weight:400}
+#mask{position:fixed;inset:0;z-index:997;background:rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .3s}
+#mask.on{opacity:1;pointer-events:auto}
+#isoToast{position:fixed;left:50%;bottom:76px;transform:translate(-50%,10px);z-index:1000;opacity:0;
+  transition:opacity .25s,transform .25s;font-size:13px;padding:8px 16px;border-radius:20px;
+  background:rgba(24,21,42,.9);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.18);color:#eee;pointer-events:none;max-width:80vw;text-align:center}
+#isoToast.on{opacity:1;transform:translate(-50%,0)}
+
+</style>
+</head>
+<body>
+
+<div id="islandWrap"><div id="island"><span class="dot"></span><span>灵动岛 · 点按展开</span><span class="cam"></span></div></div>
+<div id="mask"></div>
+<div id="curtain"><div class="panel">
+  <div class="ttl">全部远控功能 · 点一下即下发</div>
+  <div class="grid" id="isoGrid"></div>
+</div></div>
+<div id="isoToast"></div>
+
+<div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+
+<div id="netPill" class="wait" onclick="location.href='/panel/'">
+  <span class="bars" id="netBars"><i></i><i></i><i></i><i></i></span>
+  <span id="netTxt">检测中</span><span class="ms" id="netMs"></span>
+</div>
+
+<div class="wrap">
+  <div id="devBar"><span class="led"></span><span class="name">设备</span><span class="cnt" id="devCnt">检测中…</span></div>
+
+  <h1>远程控制台</h1>
+  <div class="sub">点一下就进实时画面，横屏掌控你的手机</div>
+
+  <a id="heroCard" href="/panel/">
+    <img class="cover" id="heroImg" alt="" style="display:none">
+    <div class="nocover" id="heroNo">
+      <b>实时视频</b><span>点此进入 · 横屏全屏 · 触摸即控</span>
+    </div>
+    <div class="veil"></div>
+    <div class="meta">
+      <span class="tag live" id="heroLive">待接入</span>
+      <span class="tag" id="heroFps">-- fps</span>
+      <span class="go">进入 ›</span>
+    </div>
+  </a>
+
+  <div class="sec">灵动岛 · 控制</div>
+  <div id="island">
+    <div class="pill" data-act="back"><b>‹</b>返回</div>
+    <div class="pill" data-act="home"><b>◉</b>主页</div>
+    <div class="pill" data-act="recent"><b>▤</b>多任务</div>
+    <button class="more" id="islandMore" title="更多">＋</button>
+  </div>
+  <div id="islandGrid"></div>
+
+  <div class="sec">全部功能</div>
+  <div class="grid">
+    <a class="tile wide" href="/panel/"><span class="em">▶</span><b>实时视频</b><span>横屏画面 + 触摸控制</span></a>
+    <div class="tile" data-act="screenshot"><span class="em">📸</span><b>截图</b><span>抓取当前画面</span></div>
+    <div class="tile" data-act="record"><span class="em">⏺</span><b>录屏</b><span>合成 MP4 回放</span></div>
+    <div class="tile" data-act="clipboard"><span class="em">📋</span><b>剪贴板</b><span>双向读写与历史</span></div>
+    <div class="tile" data-act="layout"><span class="em">🔍</span><b>布局拆解</b><span>读取界面节点树</span></div>
+    <div class="tile" data-act="shell"><span class="em">⌨</span><b>远程终端</b><span>执行 shell 命令</span></div>
+    <div class="tile" data-act="apps"><span class="em">▦</span><b>应用管理</b><span>列表 / 启动 / 停止</span></div>
+    <div class="tile" data-act="files"><span class="em">📁</span><b>文件浏览</b><span>目录逐层浏览</span></div>
+    <div class="tile" data-act="settings"><span class="em">⚙</span><b>设备设置</b><span>WiFi / 流量 / 亮度</span></div>
+    <div class="tile wide" href="/healthz" id="healthTile"><span class="em">🩺</span><b>后端健康</b><span id="healthTxt">检测中…</span></div>
+  </div>
+
+  <footer>
+    Cinder // 远程控制台<br>
+    <span id="verTag">v1.5.8-release</span> · 连接地址未改动，仍为当前域名
+  </footer>
+</div>
+
+<script>
+/* file:// 本地打开防呆：自动跳到线上，避免 file:///panel/ 报 ERR_FILE_NOT_FOUND */
+if (location.protocol === 'file:') { location.replace('https://cinder-brain-ops.onrender.com/home.html'); }
+
+/* ===== 连接部分：只认当前域名，不改任何地址 ===== */
+var API = location.origin;
+var DEMO = false;
+function send(cmd, extra){
+  var body = extra || {};
+  body.command = cmd;
+  return fetch(API + '/api/control?command=' + encodeURIComponent(cmd), {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+  }).then(function(r){ return r.json(); });
+}
+
+/* ===== 常驻网络测速：右上角，不用打开 ===== */
+var PING_URL = API + '/healthz';
+function netProbe(){
+  var t0 = Date.now();
+  var ctl = new AbortController();
+  var timer = setTimeout(function(){ ctl.abort(); }, 4000);
+  fetch(PING_URL, {cache:'no-store', signal:ctl.signal}).then(function(r){
+    clearTimeout(timer);
+    var ms = Date.now() - t0;
+    var bars = document.getElementById('netBars');
+    var pill = document.getElementById('netPill');
+    var lv = ms < 180 ? 4 : ms < 400 ? 3 : ms < 900 ? 2 : 1;
+    bars.className = 'bars on l' + lv;
+    bars.querySelectorAll('i').forEach(function(el,i){ el.style.opacity = i < lv ? '1' : '.25'; });
+    pill.className = r.ok ? (lv >= 3 ? 'good' : 'wait') : 'bad';
+    document.getElementById('netTxt').textContent = r.ok ? (lv >= 3 ? '网络良好' : '网络一般') : '服务异常';
+    document.getElementById('netMs').textContent = ms + 'ms';
+    var h = document.getElementById('healthTxt');
+    if (h) h.textContent = r.ok ? '后端正常 · ' + ms + 'ms' : '状态码 ' + r.status;
+  })['catch'](function(){
+    clearTimeout(timer);
+    document.getElementById('netBars').className = 'bars';
+    document.getElementById('netBars').querySelectorAll('i').forEach(function(el){ el.style.opacity = '.25'; });
+    var p = document.getElementById('netPill');
+    p.className = 'bad';
+    document.getElementById('netTxt').textContent = '离线/休眠';
+    document.getElementById('netMs').textContent = '';
+    document.getElementById('healthTxt').textContent = '无响应，可能休眠中';
+  });
+}
+netProbe();
+setInterval(netProbe, 5000);
+
+/* ===== 设备状态 ===== */
+function probeDevices(){
+  fetch(API + '/api/devices', {cache:'no-store'}).then(function(r){ return r.json(); }).then(function(d){
+    var list = (d && d.devices) || [];
+    var bar = document.getElementById('devBar');
+    bar.className = list.length ? 'online' : '';
+    document.getElementById('devCnt').textContent = list.length ? list.length + ' 台在线' : '等待 Agent 接管';
+    document.querySelector('#devBar .name').textContent = list.length ? list[0].id || list[0] : '未连接设备';
+    document.getElementById('heroLive').textContent = list.length ? 'LIVE' : '待接入';
+    document.getElementById('heroLive').style.background = list.length ? 'rgba(55,230,160,.18)' : 'rgba(255,255,255,.10)';
+  })['catch'](function(){});
+}
+probeDevices();
+setInterval(probeDevices, 6000);
+
+/* ===== 实时视频封面 ===== */
+function cover(){
+  var img = document.getElementById('heroImg');
+  fetch(API + '/api/screenshot', {cache:'no-store'}).then(function(r){ return r.blob(); }).then(function(b){
+    if (!b || b.size < 500) throw 0;
+    img.src = URL.createObjectURL(b);
+    img.style.display = 'block';
+    document.getElementById('heroNo').style.display = 'none';
+  })['catch'](function(){});
+}
+cover();
+setInterval(cover, 5000);
+
+/* ===== 灵动岛：更多面板 ===== */
+var MORE = [
+  ['💡','闪光灯','flash'],['📳','震动','vibrate'],['🔊','朗读','tts'],
+  ['🔒','锁屏','lock'],['🔓','亮屏','wake'],['📶','WiFi','wifi'],
+  ['📡','流量','data'],['⏻','电源','power'],['━','音量+','volume_up'],['▬','音量-','volume_down'],
+  ['✎','画布','draw'],['🗑','清空','clear']
+];
+var grid = document.getElementById('islandGrid');
+MORE.forEach(function(m){
+  var d = document.createElement('div');
+  d.className = 'icard';
+  d.innerHTML = '<b>' + m[0] + '</b><span>' + m[1] + '</span>';
+  d.onclick = function(ev){ ev.stopPropagation(); run(m[2], m[1]); };
+  grid.appendChild(d);
+});
+document.getElementById('islandMore').onclick = function(){
+  this.classList.toggle('open');
+  grid.classList.toggle('open');
+};
+
+/* ===== 控制执行（事件委托，按钮再多也接得住） ===== */
+function run(act, label){
+  if (act === 'screenshot') { location.href = '/panel/'; return; }
+  if (act === 'record' || act === 'clipboard' || act === 'layout' || act === 'shell' || act === 'apps' || act === 'files') {
+    location.href = '/panel/#' + act; return;
+  }
+  var map = {back:'BACK', home:'HOME', recent:'APP_SWITCH', menu:'MENU'};
+  var cmd = map[act] || act;
+  send(cmd).then(function(r){
+    if (!r || r.executed === false) toast((label || cmd) + '：等待 Agent 接管');
+    else toast((label || cmd) + ' ✓');
+  })['catch'](function(){ toast('离线，指令未送达'); });
+}
+document.addEventListener('click', function(e){
+  var el = e.target.closest ? e.target.closest('[data-act]') : null;
+  if (!el) return;
+  e.preventDefault();
+  run(el.getAttribute('data-act'), el.querySelector('b') ? el.querySelector('b').textContent : '');
+});
+
+/* ===== 轻提示 ===== */
+var tt;
+function toast(msg){
+  var el = document.getElementById('__t');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = '__t';
+    el.style.cssText = 'position:fixed;left:50%;bottom:32px;transform:translateX(-50%);z-index:99;padding:10px 18px;border-radius:999px;font-size:13px;font-weight:600;background:rgba(20,18,40,.82);color:#fff;border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(14px);opacity:0;transition:opacity .2s';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.opacity = '1';
+  clearTimeout(tt);
+  tt = setTimeout(function(){ el.style.opacity = '0'; }, 1600);
+}
+</script>
+
+<script>
+
+(function(){
+  var API = location.origin, DEMO = false;
+  var FNS = [
+    ['返回','back','↩'],['主页','home','⌂'],['多任务','recent','▢'],['菜单','menu','☰'],['电源','power','⏻'],['最近','apps','◱'],
+    ['音量+','volup','🔊'],['音量-','voldown','🔉'],['闪光灯','flash','💡'],['震动','vibrate','📳'],['朗读','tts','🔈'],['停朗读','ttsstop','⏹'],
+    ['锁屏','lock','🔒'],['亮屏','wake','🔓'],['亮度','brightness','☀'],['WiFi','wifi','📶'],['流量','data','📡'],['飞行','airplane','✈'],
+    ['截图','shot','📸'],['录屏','rec','⏺'],['停录','recstop','⏹'],['读剪贴','clipread','📥'],['写剪贴','clipwrite','📤'],['布局拆解','layout','🌳'],
+    ['画布','canvas','✎'],['点击','tap','🎯'],['滑动','swipe','↔'],['输入','text','⌨'],['开链接','openurl','🔗'],['应用','apps','📱'],
+    ['终端','term','>_'],['文件','files','🗂'],['通知','notify','🔔'],['电量','battery','🔋'],['设置','settings','⚙'],['清理','clean','🧹']
+  ];
+  var grid=document.getElementById('isoGrid'), isl=document.getElementById('island'),
+      cur=document.getElementById('curtain'), mask=document.getElementById('mask'),
+      toast=document.getElementById('isoToast');
+  if(!grid||!isl) return;
+  FNS.forEach(function(f){
+    var b=document.createElement('button');
+    b.innerHTML='<b>'+f[2]+'</b><span>'+f[0]+'</span>';
+    b.onclick=function(ev){ ev.stopPropagation(); run(f[0],f[1]); };
+    grid.appendChild(b);
+  });
+  var navpages={canvas:'/panel/#canvas',term:'/panel/#term',files:'/panel/#files',settings:'/panel/#settings',layout:'/panel/#layout'};
+  function run(name,cmd){
+    close();
+    if(navpages[cmd]){ location.href=navpages[cmd]; return; }
+    if(cmd==='openurl'){ var u=prompt('打开链接'); if(u) send('/api/control?command=openurl&url='+encodeURIComponent(u)); return; }
+    if(cmd==='text'){ var t=prompt('输入文字'); if(t) send('/api/control?command=text&text='+encodeURIComponent(t)); return; }
+    send('/api/control?command='+cmd);
+  }
+  function send(url){
+    tip('下发中… '+url.split('command=')[1]);
+    fetch(API+url,{method:'POST'}).then(function(r){return r.json().catch(function(){return {ok:true};});}).then(function(d){
+      tip(d.executed===false||d.ok===false ? '等待 APK 接管：'+url.split('command=')[1] : '✓ 已执行');
+    }).catch(function(){ tip('离线/休眠，连接失败'); });
+  }
+  var tt;
+  function tip(m){ toast.textContent=m; toast.classList.add('on'); clearTimeout(tt); tt=setTimeout(function(){toast.classList.remove('on');},1600); }
+  function open(){ cur.classList.add('open'); mask.classList.add('on'); }
+  function close(){ cur.classList.remove('open'); mask.classList.remove('on'); }
+  isl.onclick=function(){ cur.classList.contains('open')?close():open(); };
+  mask.onclick=close;
+  function ping(){
+    fetch(API+'/api/healthz',{cache:'no-store'}).then(function(r){ if(r.ok) isl.classList.add('on'); else isl.classList.remove('on'); })
+      .catch(function(){ isl.classList.remove('on'); });
+  }
+  ping(); setInterval(ping,12000);
+  document.addEventListener('visibilitychange',function(){ if(!document.hidden) ping(); });
+})();
+
+</script>
+</body>
+</html>
